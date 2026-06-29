@@ -12,11 +12,9 @@
   const COMPOSER_ID = 'nss-composer-overlay';
   const FOOTER_TEXT = '\n\n— Sent via NSS Communicator (nexavision.tech)';
 
-  // Prevent double-injection
+  // Remove existing composer to always start fresh (reloads contacts)
   if (document.getElementById(COMPOSER_ID)) {
-    const existing = document.getElementById(COMPOSER_ID);
-    existing.style.display = existing.style.display === 'none' ? 'flex' : 'none';
-    return;
+    document.getElementById(COMPOSER_ID).remove();
   }
 
   // ── Build Overlay ──────────────────────────────────────────────────
@@ -33,37 +31,24 @@
 
       <div class="nss-composer-body">
         <div class="nss-composer-field">
-          <label for="nss-channel-select">Channel</label>
-          <select id="nss-channel-select">
-            <option value="0">0 — Public (signed only)</option>
-            <option value="1" selected>1 — Private</option>
-            <option value="2">2 — Group</option>
-            <option value="3">3 — Broadcast</option>
-            <option value="4">4 — Ephemeral</option>
-            ${Array.from({ length: 11 }, (_, i) => i + 5)
-              .map((n) => `<option value="${n}">${n} — Custom</option>`)
-              .join('')}
-          </select>
-        </div>
-
-        <div class="nss-composer-field">
           <label for="nss-recipient-select">Recipient</label>
           <select id="nss-recipient-select">
-            <option value="" disabled selected>Loading contacts…</option>
+            <option value="PUBLIC" selected>🌎 Public (Anyone can read)</option>
+            <option disabled>──────────</option>
           </select>
         </div>
 
         <div class="nss-composer-field">
           <label for="nss-message-input">Message</label>
-          <textarea id="nss-message-input" rows="5" placeholder="Type your encrypted message…"></textarea>
+          <textarea id="nss-message-input" rows="5" placeholder="Type your message…"></textarea>
         </div>
 
         <div class="nss-composer-actions">
-          <button id="nss-encrypt-btn" class="nss-btn-primary">🔐 Encrypt & Copy</button>
+          <button id="nss-encrypt-btn" class="nss-btn-primary">📡 Sign & Copy</button>
           <span id="nss-composer-status" class="nss-composer-status"></span>
         </div>
 
-        <div class="nss-composer-field nss-output-field" style="display:none;">
+        <div class="nss-composer-field nss-output-field" style="display:none; margin-top:16px;">
           <label>Encrypted Output</label>
           <textarea id="nss-output" rows="3" readonly></textarea>
         </div>
@@ -240,7 +225,6 @@
 
   // ── Elements ───────────────────────────────────────────────────────
 
-  const channelSelect = document.getElementById('nss-channel-select');
   const recipientSelect = document.getElementById('nss-recipient-select');
   const messageInput = document.getElementById('nss-message-input');
   const encryptBtn = document.getElementById('nss-encrypt-btn');
@@ -256,49 +240,33 @@
     try {
       const response = await browser.runtime.sendMessage({ type: 'nss-get-contacts' });
 
-      recipientSelect.innerHTML = '';
+      // Keep the Public option and divider
+      recipientSelect.innerHTML = `
+        <option value="PUBLIC" selected>🌎 Public (Anyone can read)</option>
+        <option disabled>──────────</option>
+      `;
 
-      if (!response || !response.contacts || response.contacts.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.disabled = true;
-        opt.selected = true;
-        opt.textContent = 'No contacts — import .nss keys first';
-        recipientSelect.appendChild(opt);
-        return;
-      }
-
-      const placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.disabled = true;
-      placeholder.selected = true;
-      placeholder.textContent = 'Select recipient…';
-      recipientSelect.appendChild(placeholder);
-
-      for (const contact of response.contacts) {
-        const opt = document.createElement('option');
-        opt.value = contact.fingerprint;
-        opt.textContent = `${contact.name} (${contact.fingerprint})`;
-        recipientSelect.appendChild(opt);
+      if (response && response.contacts && response.contacts.length > 0) {
+        for (const contact of response.contacts) {
+          const opt = document.createElement('option');
+          opt.value = contact.fingerprint;
+          opt.textContent = `👤 ${contact.name} (${contact.fingerprint})`;
+          recipientSelect.appendChild(opt);
+        }
       }
     } catch (err) {
-      recipientSelect.innerHTML = `<option disabled selected>Error loading contacts</option>`;
+      console.error('[NSS] Failed to load contacts', err);
     }
   }
 
   loadContacts();
 
-  // ── Channel Change Handler ──────────────────────────────────────────
+  // ── Recipient Change Handler ───────────────────────────────────────
 
-  const recipientField = recipientSelect.closest('.nss-composer-field');
-
-  channelSelect.addEventListener('change', () => {
-    const ch = parseInt(channelSelect.value, 10);
-    if (ch === 0) {
-      recipientField.style.display = 'none';
+  recipientSelect.addEventListener('change', () => {
+    if (recipientSelect.value === 'PUBLIC') {
       encryptBtn.textContent = '📡 Sign & Copy';
     } else {
-      recipientField.style.display = 'block';
       encryptBtn.textContent = '🔐 Encrypt & Copy';
     }
   });
@@ -306,18 +274,13 @@
   // ── Encrypt & Copy ─────────────────────────────────────────────────
 
   encryptBtn.addEventListener('click', async () => {
-    const channel = parseInt(channelSelect.value, 10);
-    const recipientFp = recipientSelect.value;
+    const isPublic = recipientSelect.value === 'PUBLIC';
+    const channel = isPublic ? 0 : 1;
+    const recipientFp = isPublic ? null : recipientSelect.value;
     const message = messageInput.value.trim();
 
     if (!message) {
       setStatus('Type a message first', 'error');
-      return;
-    }
-
-    // Channel 0 doesn't need a recipient
-    if (channel !== 0 && !recipientFp) {
-      setStatus('Select a recipient', 'error');
       return;
     }
 
@@ -361,20 +324,23 @@
   }
 
   // Close handlers
-  closeBtn.addEventListener('click', () => {
-    overlay.style.display = 'none';
-  });
-
-  backdrop.addEventListener('click', () => {
-    overlay.style.display = 'none';
-  });
-
-  // Escape key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.style.display !== 'none') {
-      overlay.style.display = 'none';
+  function closeComposer() {
+    if (overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
     }
-  });
+  }
+
+  closeBtn.addEventListener('click', closeComposer);
+  backdrop.addEventListener('click', closeComposer);
+
+  // Use a named function for the escape listener so we don't leak listeners
+  function handleEscape(e) {
+    if (e.key === 'Escape' && document.getElementById(COMPOSER_ID)) {
+      closeComposer();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  }
+  document.addEventListener('keydown', handleEscape);
 
   // Focus the message input
   messageInput.focus();
