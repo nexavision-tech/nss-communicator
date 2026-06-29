@@ -304,39 +304,7 @@
   // ── Import .nss Key ────────────────────────────────────────────────
 
   importKeyBtn.addEventListener('click', () => {
-    importKeyFile.click();
-  });
-
-  importKeyFile.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const text = await file.text();
-    importKeyFile.value = '';
-
-    const result = await nssPrompt('Import Contact', [
-      { id: 'ik-name', label: 'Name for this contact:', value: file.name.replace(/\.nss$/, '') },
-      { id: 'ik-email', label: 'Email (optional):', placeholder: 'you@example.com' }
-    ]);
-    
-    if (!result || !result['ik-name']) return;
-    
-    const name = result['ik-name'];
-    const email = result['ik-email'] || '';
-
-    const response = await browser.runtime.sendMessage({
-      type: 'nss-import-key',
-      keyData: text,
-      name,
-      email,
-    });
-
-    if (response.success) {
-      showToast(`✓ Imported key: ${response.fingerprint}`, 'success');
-      await loadContacts();
-    } else {
-      showToast('✗ ' + response.error, 'error');
-    }
+    browser.tabs.create({ url: browser.runtime.getURL('popup/import.html') });
   });
 
   // ── Keyring Import/Export ──────────────────────────────────────────
@@ -353,28 +321,7 @@
   });
 
   importKeyringBtn.addEventListener('click', () => {
-    importKeyringFile.click();
-  });
-
-  importKeyringFile.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const text = await file.text();
-
-    const response = await browser.runtime.sendMessage({
-      type: 'nss-import-keyring',
-      data: text,
-    });
-
-    if (response.success) {
-      showToast(`✓ Imported ${response.imported}, skipped ${response.skipped}`, 'success');
-      await loadContacts();
-    } else {
-      showToast('✗ ' + response.error, 'error');
-    }
-
-    importKeyringFile.value = '';
+    browser.tabs.create({ url: browser.runtime.getURL('popup/import.html#keyring') });
   });
 
   // ── Utilities ──────────────────────────────────────────────────────
