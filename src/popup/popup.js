@@ -29,10 +29,8 @@
   const decryptBtn = document.getElementById('decrypt-btn');
   const contactListEl = document.getElementById('contact-list');
   const contactCountEl = document.getElementById('contact-count');
-  const importKeyFile = document.getElementById('import-key-file');
   const exportKeyringBtn = document.getElementById('export-keyring-btn');
   const importKeyringBtn = document.getElementById('import-keyring-btn');
-  const importKeyringFile = document.getElementById('import-keyring-file');
   const changePassphraseBtn = document.getElementById('change-passphrase-btn');
   const mainView = document.getElementById('main-view');
   const composerView = document.getElementById('composer-view');
@@ -429,44 +427,8 @@
     });
   }
 
-  // ── Import .nss Key ────────────────────────────────────────────────
-
-  // Static file input in HTML — the user clicks the label which triggers the file input.
-  // Firefox keeps the popup alive because this is a user-initiated click on a DOM element.
-  importKeyFile.addEventListener('change', async () => {
-    try {
-      if (!importKeyFile.files || importKeyFile.files.length === 0) return;
-
-      const file = importKeyFile.files[0];
-      const keyData = await file.text();
-      console.log('[NSS] File read OK:', file.name, 'length:', keyData.length);
-
-      // Suggest a name from the filename
-      let suggestedName = file.name.replace(/\.(nss|txt|pem)$/i, '');
-      if (suggestedName.startsWith('nss-')) {
-        suggestedName = 'Contact ' + suggestedName.substring(4, 12);
-      }
-
-      // Ask for the contact name (simple text-only modal)
-      const result = await nssPrompt('Import Contact', [
-        { id: 'import-name', label: 'Contact Name', placeholder: 'e.g. Alice', value: suggestedName }
-      ]);
-
-      if (!result) return;
-      const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
-      await handleImportContactSubmit(name, keyData);
-    } catch (err) {
-      console.error('[NSS] File read error:', err);
-      showToast('✗ Could not read file: ' + err.message, 'error');
-    } finally {
-      // Reset so the same file can be re-imported
-      importKeyFile.value = '';
-    }
-  });
-
-  // Paste fallback — for when the file picker doesn't cooperate
-  const importKeyPasteBtn = document.getElementById('import-key-paste-btn');
-  importKeyPasteBtn.addEventListener('click', async () => {
+  const importKeyBtn = document.getElementById('import-key-btn');
+  importKeyBtn.addEventListener('click', async () => {
     const result = await nssPrompt('Import Contact Key', [
       { id: 'import-name', label: 'Contact Name', placeholder: 'e.g. Alice' },
       { id: 'import-key', label: 'Paste .nss file contents below', type: 'textarea', placeholder: '-----BEGIN NSS PUBLIC KEY-----\n...\n-----END NSS PUBLIC KEY-----' }
