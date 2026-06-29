@@ -440,7 +440,6 @@
   });
 
   async function handleImportContactSubmit(name, keyData) {
-    console.log('[NSS] Import contact:', name, 'keyData length:', keyData ? keyData.length : 0);
     try {
       const response = await browser.runtime.sendMessage({
         type: 'nss-import-key',
@@ -449,8 +448,6 @@
         keyData: keyData.trim()
       });
 
-      console.log('[NSS] Import response:', response);
-
       if (response.success) {
         showToast('✓ Contact imported: ' + name, 'success');
         await loadContacts();
@@ -458,7 +455,6 @@
         showToast('✗ ' + response.error, 'error');
       }
     } catch (err) {
-      console.error('[NSS] Import error:', err);
       showToast('✗ ' + err.message, 'error');
     }
   }
@@ -518,7 +514,6 @@
     
     const file = e.dataTransfer.files[0];
     const text = await file.text();
-    console.log('[NSS] Drop:', file.name, 'length:', text.length);
 
     if (file.name.endsWith('.json')) {
       // Keyring import — just do it directly
@@ -618,8 +613,6 @@
           <label for="${f.id}">${escapeHtml(f.label)}</label>
           ${f.type === 'textarea'
             ? `<textarea id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" rows="4" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; resize: vertical; font-family: monospace; font-size: 11px; margin-top: 4px;">${escapeHtml(f.value || '')}</textarea>`
-            : f.type === 'file'
-            ? `<input type="file" id="${f.id}" accept="${escapeHtml(f.accept || '')}" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; margin-top: 4px;">`
             : `<input type="${f.type || 'text'}" id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}" style="margin-top: 4px;">`
           }
         </div>
@@ -630,15 +623,7 @@
       const results = {};
       for (const f of fields) {
         const el = document.getElementById(f.id);
-        if (f.type === 'file') {
-          if (el.files && el.files.length > 0) {
-            results[f.id] = await el.files[0].text();
-          } else {
-            results[f.id] = null;
-          }
-        } else {
-          results[f.id] = el.value;
-        }
+        results[f.id] = el.value;
       }
       resolve(results);
     });

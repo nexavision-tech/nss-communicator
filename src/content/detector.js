@@ -16,9 +16,6 @@
   const NSS_PATTERN = />>--\s*NSS:v1:\d{1,2}:[0-9a-f]{8}:[\s\S]*?-->/g;
   const NSS_CLASS = 'nss-encrypted';
   const NSS_PROCESSED_ATTR = 'data-nss-detected';
-  const SCAN_DEBOUNCE_MS = 150;
-
-  let scanTimeout = null;
 
   // ── Core Detection ─────────────────────────────────────────────────
 
@@ -123,15 +120,6 @@
     }
   }
 
-  /**
-   * Debounced full-page scan. Used sparingly — primarily on initial load.
-   */
-  function scheduleScan() {
-    if (scanTimeout) clearTimeout(scanTimeout);
-    scanTimeout = setTimeout(() => {
-      scanSubtree(document.body);
-    }, SCAN_DEBOUNCE_MS);
-  }
 
   // ── MutationObserver ───────────────────────────────────────────────
 
