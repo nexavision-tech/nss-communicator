@@ -32,7 +32,7 @@
           <code id="lock-fingerprint">--------</code>
         </div>
         <div class="nss-field">
-          <input type="password" id="unlock-passphrase" placeholder="Enter passphrase">
+          <input type="password" id="unlock-passphrase" placeholder="Enter passphrase" autocomplete="current-password">
         </div>
         <button id="unlock-btn" class="nss-btn nss-btn-primary nss-btn-full">
           🔓 Unlock
@@ -53,10 +53,10 @@
         </div>
         <div class="nss-field">
           <label for="generate-passphrase">Passphrase (protects your keys)</label>
-          <input type="password" id="generate-passphrase" placeholder="Min 8 characters" required>
+          <input type="password" id="generate-passphrase" placeholder="Min 8 characters" required autocomplete="new-password">
         </div>
         <div class="nss-field">
-          <input type="password" id="generate-passphrase-confirm" placeholder="Confirm passphrase">
+          <input type="password" id="generate-passphrase-confirm" placeholder="Confirm passphrase" autocomplete="new-password">
         </div>
         <button id="generate-btn" class="nss-btn nss-btn-primary">
           🔑 Generate Keys

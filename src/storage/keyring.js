@@ -94,7 +94,7 @@ const NSSKeyring = (() => {
       },
       keyMaterial,
       { name: 'AES-GCM', length: 256 },
-      false,
+      true,   // extractable — needed for session storage persistence
       ['encrypt', 'decrypt']
     );
   }
@@ -157,6 +157,8 @@ const NSSKeyring = (() => {
 
       // Success — store wrapping key in memory
       _wrappingKey = wrappingKey;
+      await _saveSession(wrappingKey);
+      _resetLockTimer();
       return true;
     } catch (e) {
       _wrappingKey = null;
@@ -169,6 +171,7 @@ const NSSKeyring = (() => {
    */
   function lock() {
     _wrappingKey = null;
+    _clearSession();
   }
 
   /**
@@ -340,6 +343,66 @@ const NSSKeyring = (() => {
     return { imported, skipped };
   }
 
+  // ── Session Storage (Chrome MV3 service worker persistence) ──────
+  // Chrome's service workers die after ~30s of inactivity, wiping
+  // the in-memory _wrappingKey. We persist the raw key bytes in
+  // chrome.storage.session (memory-only, never written to disk,
+  // cleared on browser close). Firefox MV2 doesn't have this API.
+
+  function _hasSessionStorage() {
+    return typeof browser !== 'undefined' &&
+           browser.storage &&
+           typeof browser.storage.session !== 'undefined';
+  }
+
+  async function _saveSession(wrappingKey) {
+    if (!_hasSessionStorage()) return;
+    try {
+      const raw = await crypto.subtle.exportKey('raw', wrappingKey);
+      await browser.storage.session.set({
+        _nssKey: Array.from(new Uint8Array(raw)),
+        _nssKeyTime: Date.now(),
+      });
+    } catch (e) {
+      // Silently fail — session persistence is best-effort
+    }
+  }
+
+  function _clearSession() {
+    if (!_hasSessionStorage()) return;
+    try { browser.storage.session.remove(['_nssKey', '_nssKeyTime']); } catch (e) { /* */ }
+  }
+
+  /**
+   * Try to restore the wrapping key from session storage.
+   * Called by background.js on service worker restart.
+   * @returns {Promise<boolean>} — true if session was restored
+   */
+  async function tryRestoreSession() {
+    if (!_hasSessionStorage()) return false;
+    if (_wrappingKey) return true;  // Already unlocked
+    try {
+      const data = await browser.storage.session.get(['_nssKey', '_nssKeyTime']);
+      if (!data._nssKey) return false;
+
+      // Check if session has expired (15 minutes)
+      if (Date.now() - data._nssKeyTime > AUTO_LOCK_MS) {
+        _clearSession();
+        return false;
+      }
+
+      // Re-import the wrapping key
+      const rawKey = new Uint8Array(data._nssKey).buffer;
+      _wrappingKey = await crypto.subtle.importKey(
+        'raw', rawKey, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+      );
+      _resetLockTimer();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ── Auto-Lock Timer ───────────────────────────────────────────────
 
   let _lockTimer = null;
@@ -376,6 +439,8 @@ const NSSKeyring = (() => {
     importKeyring,
     // Auto-lock
     _resetLockTimer,
+    // Session persistence (Chrome MV3)
+    tryRestoreSession,
   };
 })();
 

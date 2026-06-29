@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$SCRIPT_DIR/src"
 DIST_DIR="$SCRIPT_DIR/dist/chrome"
 
+POLYFILL='if (typeof browser === "undefined") { globalThis.browser = chrome; }'
+
 echo "==> Cleaning previous build…"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
@@ -15,9 +17,8 @@ cp -r "$SRC_DIR"/* "$DIST_DIR"/
 
 echo "==> Bundling background scripts into background-bundle.js…"
 {
-  # Polyfill: map Firefox's `browser` namespace to Chrome's `chrome` namespace
   echo '// --- Chrome MV3 polyfill ---'
-  echo 'if (typeof browser === "undefined") { globalThis.browser = chrome; }'
+  echo "$POLYFILL"
   echo ''
 
   # Concatenate the four background scripts in the original load order
@@ -27,6 +28,24 @@ echo "==> Bundling background scripts into background-bundle.js…"
     echo ''
   done
 } > "$DIST_DIR/background-bundle.js"
+
+echo "==> Injecting browser polyfill into popup.js…"
+{
+  echo "// --- Chrome polyfill ---"
+  echo "$POLYFILL"
+  echo ''
+  cat "$SRC_DIR/popup/popup.js"
+} > "$DIST_DIR/popup/popup.js"
+
+echo "==> Injecting browser polyfill into content scripts…"
+for file in content/detector.js content/injector.js; do
+  {
+    echo "// --- Chrome polyfill ---"
+    echo "$POLYFILL"
+    echo ''
+    cat "$SRC_DIR/$file"
+  } > "$DIST_DIR/$file"
+done
 
 echo "==> Replacing manifest with Chrome MV3 version…"
 cp "$SRC_DIR/chrome-manifest.json" "$DIST_DIR/manifest.json"

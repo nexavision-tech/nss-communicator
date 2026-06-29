@@ -3,22 +3,39 @@
  * Handles message passing from content scripts, keyring management,
  * key import/export, and encryption/decryption operations.
  *
+ * NOTE: The message listener MUST be registered synchronously at the
+ * top level for Chrome MV3 service worker compatibility.
+ *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-(async function NSSBackground() {
+(function NSSBackground() {
   'use strict';
 
-  // ── Initialize Keyring ─────────────────────────────────────────────
+  // ── Lazy Keyring Init ───────────────────────────────────────────────
+  // Chrome MV3 service workers require listeners at top level (sync).
+  // We init the keyring lazily on first message instead of blocking.
 
-  await NSSKeyring.initKeyring();
-  console.log('[NSS] Background initialized — keyring ready');
+  let _keyringReady = false;
+
+  async function ensureKeyring() {
+    if (!_keyringReady) {
+      await NSSKeyring.initKeyring();
+      await NSSKeyring.tryRestoreSession();
+      _keyringReady = true;
+      console.log('[NSS] Background initialized — keyring ready');
+    }
+  }
 
   // ── Message Handler ────────────────────────────────────────────────
+  // Registered synchronously — required for Chrome MV3 service workers.
 
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // All handlers are async — return true to keep message channel open
-    handleMessage(message, sender).then(sendResponse);
+    ensureKeyring()
+      .then(() => handleMessage(message, sender))
+      .then(sendResponse)
+      .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   });
 
