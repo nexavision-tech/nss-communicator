@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "NSS Communicator",
+  "description": "Not So Super Sneaky — Encrypted messaging overlay for social media",
+  "version": "0.1.0",
+  "icons": {
+    "48": "icons/nss-48-v2.png",
+    "96": "icons/nss-96-v2.png"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "clipboardWrite"
+  ],
+  "action": {
+    "default_icon": {
+      "48": "icons/nss-48-v2.png",
+      "96": "icons/nss-96-v2.png"
+    },
+    "default_title": "NSS Communicator",
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background-bundle.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/detector.js",
+        "content/injector.js"
+      ],
+      "css": [
+        "styles/nss-inline.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "styles/nss-inline.css",
+        "icons/nss-48-v2.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}
