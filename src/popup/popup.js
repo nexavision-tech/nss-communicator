@@ -29,7 +29,6 @@
   const decryptBtn = document.getElementById('decrypt-btn');
   const contactListEl = document.getElementById('contact-list');
   const contactCountEl = document.getElementById('contact-count');
-  const importKeyBtn = document.getElementById('import-key-btn');
   const importKeyFile = document.getElementById('import-key-file');
   const exportKeyringBtn = document.getElementById('export-keyring-btn');
   const importKeyringBtn = document.getElementById('import-keyring-btn');
@@ -432,45 +431,50 @@
 
   // ── Import .nss Key ────────────────────────────────────────────────
 
-  importKeyBtn.addEventListener('click', () => {
-    // Use a direct file input — NOT inside a modal (more reliable in extension popups)
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.nss,.txt,.pem';
-    fileInput.style.display = 'none';
-    document.body.appendChild(fileInput);
+  // Static file input in HTML — the user clicks the label which triggers the file input.
+  // Firefox keeps the popup alive because this is a user-initiated click on a DOM element.
+  importKeyFile.addEventListener('change', async () => {
+    try {
+      if (!importKeyFile.files || importKeyFile.files.length === 0) return;
 
-    fileInput.addEventListener('change', async () => {
-      try {
-        if (!fileInput.files || fileInput.files.length === 0) return;
+      const file = importKeyFile.files[0];
+      const keyData = await file.text();
+      console.log('[NSS] File read OK:', file.name, 'length:', keyData.length);
 
-        const file = fileInput.files[0];
-        const keyData = await file.text();
-        console.log('[NSS] File read OK:', file.name, 'length:', keyData.length);
-
-        // Suggest a name from the filename
-        let suggestedName = file.name.replace(/\.(nss|txt|pem)$/i, '');
-        if (suggestedName.startsWith('nss-')) {
-          suggestedName = 'Contact ' + suggestedName.substring(4, 12);
-        }
-
-        // Ask for the contact name (simple text-only modal, no file inputs)
-        const result = await nssPrompt('Import Contact', [
-          { id: 'import-name', label: 'Contact Name', placeholder: 'e.g. Alice', value: suggestedName }
-        ]);
-
-        if (!result) return;
-        const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
-        await handleImportContactSubmit(name, keyData);
-      } catch (err) {
-        console.error('[NSS] File read error:', err);
-        showToast('✗ Could not read file: ' + err.message, 'error');
-      } finally {
-        document.body.removeChild(fileInput);
+      // Suggest a name from the filename
+      let suggestedName = file.name.replace(/\.(nss|txt|pem)$/i, '');
+      if (suggestedName.startsWith('nss-')) {
+        suggestedName = 'Contact ' + suggestedName.substring(4, 12);
       }
-    });
 
-    fileInput.click();
+      // Ask for the contact name (simple text-only modal)
+      const result = await nssPrompt('Import Contact', [
+        { id: 'import-name', label: 'Contact Name', placeholder: 'e.g. Alice', value: suggestedName }
+      ]);
+
+      if (!result) return;
+      const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
+      await handleImportContactSubmit(name, keyData);
+    } catch (err) {
+      console.error('[NSS] File read error:', err);
+      showToast('✗ Could not read file: ' + err.message, 'error');
+    } finally {
+      // Reset so the same file can be re-imported
+      importKeyFile.value = '';
+    }
+  });
+
+  // Paste fallback — for when the file picker doesn't cooperate
+  const importKeyPasteBtn = document.getElementById('import-key-paste-btn');
+  importKeyPasteBtn.addEventListener('click', async () => {
+    const result = await nssPrompt('Import Contact Key', [
+      { id: 'import-name', label: 'Contact Name', placeholder: 'e.g. Alice' },
+      { id: 'import-key', label: 'Paste .nss file contents below', type: 'textarea', placeholder: '-----BEGIN NSS PUBLIC KEY-----\n...\n-----END NSS PUBLIC KEY-----' }
+    ]);
+
+    if (!result || !result['import-key']) return;
+    const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
+    await handleImportContactSubmit(name, result['import-key']);
   });
 
   async function handleImportContactSubmit(name, keyData) {

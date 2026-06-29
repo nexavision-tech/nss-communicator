@@ -108,9 +108,11 @@
       </div>
 
       <div class="nss-contact-actions">
-        <button id="import-key-btn" class="nss-btn nss-btn-secondary">
+        <label for="import-key-file" class="nss-btn nss-btn-secondary" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
           📥 Import .nss Key
-        </button>
+          <input type="file" id="import-key-file" accept=".nss,.txt,.pem" style="display: none;">
+        </label>
+        <button id="import-key-paste-btn" class="nss-btn nss-btn-ghost nss-btn-small" title="Paste key manually">📋 Paste</button>
       </div>
     </section>
 
