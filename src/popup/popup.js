@@ -450,6 +450,7 @@
   });
 
   async function handleImportContactSubmit(name, keyData) {
+    console.log('[NSS] Import contact:', name, 'keyData length:', keyData ? keyData.length : 0);
     try {
       const response = await browser.runtime.sendMessage({
         type: 'nss-import-key',
@@ -458,13 +459,16 @@
         keyData: keyData.trim()
       });
 
+      console.log('[NSS] Import response:', response);
+
       if (response.success) {
-        showToast('✓ Contact imported successfully', 'success');
+        showToast('✓ Contact imported: ' + name, 'success');
         await loadContacts();
       } else {
         showToast('✗ ' + response.error, 'error');
       }
     } catch (err) {
+      console.error('[NSS] Import error:', err);
       showToast('✗ ' + err.message, 'error');
     }
   }
@@ -608,9 +612,15 @@
         cancelBtn.onclick = null;
       };
       
-      confirmBtn.onclick = () => {
+      confirmBtn.onclick = async () => {
+        try {
+          // Run onConfirm BEFORE cleanup so file inputs are still readable
+          await onConfirm(resolve);
+        } catch (err) {
+          console.error('[NSS] Modal confirm error:', err);
+          resolve(null);
+        }
         cleanup();
-        onConfirm(resolve);
       };
       
       cancelBtn.onclick = () => {
