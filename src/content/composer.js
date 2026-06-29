@@ -288,6 +288,21 @@
 
   loadContacts();
 
+  // ── Channel Change Handler ──────────────────────────────────────────
+
+  const recipientField = recipientSelect.closest('.nss-composer-field');
+
+  channelSelect.addEventListener('change', () => {
+    const ch = parseInt(channelSelect.value, 10);
+    if (ch === 0) {
+      recipientField.style.display = 'none';
+      encryptBtn.textContent = '📡 Sign & Copy';
+    } else {
+      recipientField.style.display = 'block';
+      encryptBtn.textContent = '🔐 Encrypt & Copy';
+    }
+  });
+
   // ── Encrypt & Copy ─────────────────────────────────────────────────
 
   encryptBtn.addEventListener('click', async () => {
