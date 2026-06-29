@@ -367,6 +367,51 @@ body {
   font-family: monospace;
 }
 
+/* ── Lock Screen ─────────────────────────────────────────────────── */
+
+.nss-lock-screen {
+  padding: 24px 20px;
+}
+
+.nss-lock-card {
+  text-align: center;
+  padding: 24px 18px;
+}
+
+.nss-lock-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4));
+  animation: nss-lock-pulse 2s ease-in-out infinite;
+}
+
+@keyframes nss-lock-pulse {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(0, 255, 136, 0.3)); }
+  50% { filter: drop-shadow(0 0 14px rgba(0, 255, 136, 0.6)); }
+}
+
+.nss-lock-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.nss-lock-fp {
+  margin: 12px 0;
+}
+
+.nss-lock-fp code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  color: #00ff88;
+  background: #0a0e17;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
 /* ── Toast ────────────────────────────────────────────────────────── */
 
 .nss-toast {

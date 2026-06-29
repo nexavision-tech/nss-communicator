@@ -1,7 +1,7 @@
 /**
  * NSS Communicator — Popup Logic
  * Initializes UI from keyring, handles key generation, import/export,
- * and contact management.
+ * contact management, and passphrase lock/unlock.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -13,11 +13,18 @@
 
   const noIdentityEl = document.getElementById('no-identity');
   const hasIdentityEl = document.getElementById('has-identity');
+  const lockScreenEl = document.getElementById('lock-screen');
   const fingerprintEl = document.getElementById('identity-fingerprint');
   const emailEl = document.getElementById('identity-email');
+  const lockFingerprintEl = document.getElementById('lock-fingerprint');
   const generateBtn = document.getElementById('generate-btn');
   const generateEmailInput = document.getElementById('generate-email');
+  const generatePassphraseInput = document.getElementById('generate-passphrase');
+  const generatePassphraseConfirm = document.getElementById('generate-passphrase-confirm');
   const exportOwnKeyBtn = document.getElementById('export-own-key-btn');
+  const lockBtn = document.getElementById('lock-btn');
+  const unlockBtn = document.getElementById('unlock-btn');
+  const unlockPassphraseInput = document.getElementById('unlock-passphrase');
   const composeBtn = document.getElementById('compose-btn');
   const contactListEl = document.getElementById('contact-list');
   const contactCountEl = document.getElementById('contact-count');
@@ -26,6 +33,7 @@
   const exportKeyringBtn = document.getElementById('export-keyring-btn');
   const importKeyringBtn = document.getElementById('import-keyring-btn');
   const importKeyringFile = document.getElementById('import-keyring-file');
+  const changePassphraseBtn = document.getElementById('change-passphrase-btn');
 
   // ── Initialize ─────────────────────────────────────────────────────
 
@@ -34,35 +42,87 @@
     await loadContacts();
   }
 
+  // ── View State ─────────────────────────────────────────────────────
+
+  function showView(view) {
+    noIdentityEl.style.display = 'none';
+    hasIdentityEl.style.display = 'none';
+    lockScreenEl.style.display = 'none';
+
+    // Hide the rest of the popup when locked or no identity
+    const identitySection = document.getElementById('identity-section');
+    const sections = document.querySelectorAll('.nss-section:not(#identity-section):not(#lock-screen)');
+
+    if (view === 'no-identity') {
+      noIdentityEl.style.display = 'block';
+      identitySection.style.display = '';
+      sections.forEach((s) => (s.style.display = 'none'));
+      composeBtn.disabled = true;
+    } else if (view === 'locked') {
+      lockScreenEl.style.display = '';
+      identitySection.style.display = 'none';
+      sections.forEach((s) => (s.style.display = 'none'));
+      composeBtn.disabled = true;
+    } else if (view === 'unlocked') {
+      hasIdentityEl.style.display = 'block';
+      identitySection.style.display = '';
+      sections.forEach((s) => (s.style.display = ''));
+      composeBtn.disabled = false;
+    }
+  }
+
   // ── Identity ───────────────────────────────────────────────────────
 
   async function loadIdentity() {
     const response = await browser.runtime.sendMessage({ type: 'nss-get-identity' });
 
     if (response.success && response.identity) {
-      noIdentityEl.style.display = 'none';
-      hasIdentityEl.style.display = 'block';
-      fingerprintEl.textContent = response.identity.fingerprint;
-      emailEl.textContent = response.identity.email || '—';
-      composeBtn.disabled = false;
+      if (response.identity.locked) {
+        // Identity exists but keyring is locked
+        lockFingerprintEl.textContent = response.identity.fingerprint;
+        showView('locked');
+      } else {
+        // Identity exists and keyring is unlocked
+        fingerprintEl.textContent = response.identity.fingerprint;
+        emailEl.textContent = response.identity.email || '—';
+        showView('unlocked');
+      }
     } else {
-      noIdentityEl.style.display = 'block';
-      hasIdentityEl.style.display = 'none';
-      composeBtn.disabled = true;
+      showView('no-identity');
     }
   }
 
+  // ── Generate Keys ──────────────────────────────────────────────────
+
   generateBtn.addEventListener('click', async () => {
+    const passphrase = generatePassphraseInput.value;
+    const confirm = generatePassphraseConfirm.value;
+
+    // Validate passphrase
+    if (!passphrase || passphrase.length < 8) {
+      showToast('✗ Passphrase must be at least 8 characters', 'error');
+      return;
+    }
+
+    if (passphrase !== confirm) {
+      showToast('✗ Passphrases do not match', 'error');
+      return;
+    }
+
     generateBtn.disabled = true;
     generateBtn.textContent = '⏳ Generating RSA-4096…';
 
     const response = await browser.runtime.sendMessage({
       type: 'nss-generate-keys',
       email: generateEmailInput.value.trim(),
+      passphrase,
     });
 
     if (response.success) {
       showToast('✓ Identity created!', 'success');
+      // Clear passphrase fields
+      generatePassphraseInput.value = '';
+      generatePassphraseConfirm.value = '';
       await loadIdentity();
     } else {
       showToast('✗ ' + response.error, 'error');
@@ -70,6 +130,81 @@
 
     generateBtn.disabled = false;
     generateBtn.textContent = '🔑 Generate Keys';
+  });
+
+  // ── Unlock ─────────────────────────────────────────────────────────
+
+  unlockBtn.addEventListener('click', async () => {
+    const passphrase = unlockPassphraseInput.value;
+
+    if (!passphrase) {
+      showToast('✗ Enter your passphrase', 'error');
+      return;
+    }
+
+    unlockBtn.disabled = true;
+    unlockBtn.textContent = '⏳ Unlocking…';
+
+    const response = await browser.runtime.sendMessage({
+      type: 'nss-unlock',
+      passphrase,
+    });
+
+    if (response.success) {
+      unlockPassphraseInput.value = '';
+      showToast('✓ Keyring unlocked', 'success');
+      await loadIdentity();
+      await loadContacts();
+    } else {
+      showToast('✗ ' + response.error, 'error');
+    }
+
+    unlockBtn.disabled = false;
+    unlockBtn.textContent = '🔓 Unlock';
+  });
+
+  // Allow Enter key to unlock
+  unlockPassphraseInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') unlockBtn.click();
+  });
+
+  // ── Lock ───────────────────────────────────────────────────────────
+
+  lockBtn.addEventListener('click', async () => {
+    await browser.runtime.sendMessage({ type: 'nss-lock' });
+    showToast('🔒 Keyring locked', 'success');
+    await loadIdentity();
+  });
+
+  // ── Change Passphrase ──────────────────────────────────────────────
+
+  changePassphraseBtn.addEventListener('click', async () => {
+    const currentPassphrase = prompt('Enter current passphrase:');
+    if (!currentPassphrase) return;
+
+    const newPassphrase = prompt('Enter new passphrase (min 8 chars):');
+    if (!newPassphrase || newPassphrase.length < 8) {
+      showToast('✗ New passphrase must be at least 8 characters', 'error');
+      return;
+    }
+
+    const confirmNew = prompt('Confirm new passphrase:');
+    if (newPassphrase !== confirmNew) {
+      showToast('✗ Passphrases do not match', 'error');
+      return;
+    }
+
+    const response = await browser.runtime.sendMessage({
+      type: 'nss-change-passphrase',
+      currentPassphrase,
+      newPassphrase,
+    });
+
+    if (response.success) {
+      showToast('✓ Passphrase changed', 'success');
+    } else {
+      showToast('✗ ' + response.error, 'error');
+    }
   });
 
   // ── Export Own Key ─────────────────────────────────────────────────
@@ -92,6 +227,13 @@
   // ── Compose ────────────────────────────────────────────────────────
 
   composeBtn.addEventListener('click', async () => {
+    // Check if unlocked first
+    const idResp = await browser.runtime.sendMessage({ type: 'nss-get-identity' });
+    if (idResp.success && idResp.identity && idResp.identity.locked) {
+      showToast('✗ Keyring is locked — unlock first', 'error');
+      return;
+    }
+
     const response = await browser.runtime.sendMessage({ type: 'nss-open-composer' });
 
     if (response.success) {

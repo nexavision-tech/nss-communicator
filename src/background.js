@@ -36,6 +36,15 @@
       case 'nss-generate-keys':
         return handleGenerateKeys(message);
 
+      case 'nss-unlock':
+        return handleUnlock(message);
+
+      case 'nss-lock':
+        return handleLock();
+
+      case 'nss-change-passphrase':
+        return handleChangePassphrase(message);
+
       case 'nss-get-contacts':
         return handleGetContacts();
 
@@ -62,17 +71,52 @@
     }
   }
 
+  // ── Unlock / Lock / Change Passphrase ─────────────────────────────
+
+  async function handleUnlock(message) {
+    try {
+      await NSSKeyring.unlock(message.passphrase);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  async function handleLock() {
+    NSSKeyring.lock();
+    return { success: true };
+  }
+
+  async function handleChangePassphrase(message) {
+    try {
+      // If keyring is not unlocked, try to unlock with the current passphrase
+      if (!NSSKeyring.isUnlocked()) {
+        await NSSKeyring.unlock(message.currentPassphrase);
+      }
+      await NSSKeyring.changePassphrase(message.newPassphrase);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
   // ── Decrypt ────────────────────────────────────────────────────────
 
   async function handleDecrypt(message) {
     try {
+      // Check if keyring is unlocked
+      if (!NSSKeyring.isUnlocked()) {
+        return { success: false, error: 'locked' };
+      }
+
       const identity = await NSSKeyring.getIdentity();
       if (!identity) {
         return { success: false, error: 'no-identity' };
       }
 
-      // Import private keys
-      const privateKeys = await NSSKeys.importPrivateKey(identity.privateKey);
+      // Get decrypted private key and import it
+      const privateKeyStr = await NSSKeyring.getPrivateKey();
+      const privateKeys = await NSSKeys.importPrivateKey(privateKeyStr);
 
       // Parse header to get sender fingerprint
       const header = NSSEncrypt.parseHeader(message.nssString);
@@ -136,12 +180,19 @@
 
   async function handleEncrypt(message) {
     try {
+      // Check if keyring is unlocked
+      if (!NSSKeyring.isUnlocked()) {
+        return { success: false, error: 'locked' };
+      }
+
       const identity = await NSSKeyring.getIdentity();
       if (!identity) {
         return { success: false, error: 'No identity — generate keys first' };
       }
 
-      const senderPrivateKeys = await NSSKeys.importPrivateKey(identity.privateKey);
+      // Get decrypted private key and import it
+      const privateKeyStr = await NSSKeyring.getPrivateKey();
+      const senderPrivateKeys = await NSSKeys.importPrivateKey(privateKeyStr);
       const senderPublicKeys = await NSSKeys.importPublicKey(identity.publicKey);
 
       let recipientPublicKeys;
@@ -186,6 +237,7 @@
           fingerprint: identity.fingerprint,
           email: identity.email,
           createdAt: identity.createdAt,
+          locked: identity.locked,
         },
       };
     } catch (err) {
@@ -196,7 +248,7 @@
   async function handleGenerateKeys(message) {
     try {
       const keypair = await NSSKeys.generateKeyPair();
-      await NSSKeyring.saveIdentity(keypair, message.email || '');
+      await NSSKeyring.saveIdentity(keypair, message.passphrase, message.email || '');
 
       const identity = await NSSKeyring.getIdentity();
       return {

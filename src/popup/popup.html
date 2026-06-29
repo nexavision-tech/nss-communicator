@@ -19,6 +19,25 @@
       </div>
     </header>
 
+    <!-- Lock Screen -->
+    <section id="lock-screen" class="nss-section nss-lock-screen" style="display: none;">
+      <div class="nss-card nss-lock-card">
+        <div class="nss-lock-icon">🔒</div>
+        <h2 class="nss-lock-title">Keyring Locked</h2>
+        <p class="nss-muted">Enter your passphrase to unlock</p>
+        <div class="nss-lock-fp">
+          <span class="nss-label">Fingerprint</span>
+          <code id="lock-fingerprint">--------</code>
+        </div>
+        <div class="nss-field">
+          <input type="password" id="unlock-passphrase" placeholder="Enter passphrase">
+        </div>
+        <button id="unlock-btn" class="nss-btn nss-btn-primary nss-btn-full">
+          🔓 Unlock
+        </button>
+      </div>
+    </section>
+
     <!-- Identity Section -->
     <section class="nss-section" id="identity-section">
       <h2 class="nss-section-title">Identity</h2>
@@ -29,6 +48,13 @@
         <div class="nss-field">
           <label for="generate-email">Email (optional)</label>
           <input type="email" id="generate-email" placeholder="you@example.com">
+        </div>
+        <div class="nss-field">
+          <label for="generate-passphrase">Passphrase (protects your keys)</label>
+          <input type="password" id="generate-passphrase" placeholder="Min 8 characters" required>
+        </div>
+        <div class="nss-field">
+          <input type="password" id="generate-passphrase-confirm" placeholder="Confirm passphrase">
         </div>
         <button id="generate-btn" class="nss-btn nss-btn-primary">
           🔑 Generate Keys
@@ -50,6 +76,9 @@
         <div class="nss-identity-actions">
           <button id="export-own-key-btn" class="nss-btn nss-btn-secondary" title="Export your .nss public key">
             📤 Export .nss
+          </button>
+          <button id="lock-btn" class="nss-btn nss-btn-secondary" title="Lock the keyring">
+            🔓 Lock
           </button>
         </div>
       </div>
@@ -92,6 +121,9 @@
         </button>
         <button id="import-keyring-btn" class="nss-btn nss-btn-ghost">
           📂 Import Keyring
+        </button>
+        <button id="change-passphrase-btn" class="nss-btn nss-btn-ghost">
+          🔑 Change Passphrase
         </button>
         <input type="file" id="import-keyring-file" accept=".json" style="display: none;">
       </div>
