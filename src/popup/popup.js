@@ -476,27 +476,13 @@
     }
   });
 
-  importKeyringBtn.addEventListener('click', () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';
-    fileInput.style.display = 'none';
-    document.body.appendChild(fileInput);
+  importKeyringBtn.addEventListener('click', async () => {
+    const result = await nssPrompt('Import Keyring', [
+      { id: 'import-keyring', label: 'Paste nss-keyring.json contents below', type: 'textarea', placeholder: '{"version":2, ...}' }
+    ]);
 
-    fileInput.addEventListener('change', async () => {
-      try {
-        if (!fileInput.files || fileInput.files.length === 0) return;
-        const data = await fileInput.files[0].text();
-        await handleImportKeyringSubmit(data);
-      } catch (err) {
-        console.error('[NSS] Keyring file read error:', err);
-        showToast('✗ Could not read file: ' + err.message, 'error');
-      } finally {
-        document.body.removeChild(fileInput);
-      }
-    });
-
-    fileInput.click();
+    if (!result || !result['import-keyring']) return;
+    await handleImportKeyringSubmit(result['import-keyring']);
   });
 
   async function handleImportKeyringSubmit(data) {
