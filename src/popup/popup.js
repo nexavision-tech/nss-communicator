@@ -432,21 +432,45 @@
 
   // ── Import .nss Key ────────────────────────────────────────────────
 
-  importKeyBtn.addEventListener('click', async () => {
-    const result = await nssPrompt('Import Contact Key', [
-      { id: 'import-name', label: 'Contact Name (e.g. Alice)', placeholder: 'Alice' },
-      { id: 'import-file', label: 'Browse for .nss file (or drag here)', type: 'file', accept: '.nss,.txt' },
-      { id: 'import-key', label: 'OR Paste .nss Public Key', type: 'textarea', placeholder: '-----BEGIN PUBLIC KEY-----\n...' }
-    ]);
-    
-    if (!result) return;
-    const keyData = result['import-file'] || result['import-key'];
-    if (!keyData) {
-      showToast('✗ Please select a file or paste a key', 'error');
-      return;
-    }
-    const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
-    await handleImportContactSubmit(name, keyData);
+  importKeyBtn.addEventListener('click', () => {
+    // Use a direct file input — NOT inside a modal (more reliable in extension popups)
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.nss,.txt,.pem';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    fileInput.addEventListener('change', async () => {
+      try {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+
+        const file = fileInput.files[0];
+        const keyData = await file.text();
+        console.log('[NSS] File read OK:', file.name, 'length:', keyData.length);
+
+        // Suggest a name from the filename
+        let suggestedName = file.name.replace(/\.(nss|txt|pem)$/i, '');
+        if (suggestedName.startsWith('nss-')) {
+          suggestedName = 'Contact ' + suggestedName.substring(4, 12);
+        }
+
+        // Ask for the contact name (simple text-only modal, no file inputs)
+        const result = await nssPrompt('Import Contact', [
+          { id: 'import-name', label: 'Contact Name', placeholder: 'e.g. Alice', value: suggestedName }
+        ]);
+
+        if (!result) return;
+        const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
+        await handleImportContactSubmit(name, keyData);
+      } catch (err) {
+        console.error('[NSS] File read error:', err);
+        showToast('✗ Could not read file: ' + err.message, 'error');
+      } finally {
+        document.body.removeChild(fileInput);
+      }
+    });
+
+    fileInput.click();
   });
 
   async function handleImportContactSubmit(name, keyData) {
@@ -486,19 +510,27 @@
     }
   });
 
-  importKeyringBtn.addEventListener('click', async () => {
-    const result = await nssPrompt('Import Keyring', [
-      { id: 'import-file', label: 'Browse for nss-keyring.json', type: 'file', accept: '.json' },
-      { id: 'import-keyring', label: 'OR Paste nss-keyring.json contents', type: 'textarea' }
-    ]);
-    
-    if (!result) return;
-    const data = result['import-file'] || result['import-keyring'];
-    if (!data) {
-      showToast('✗ Please select a file or paste contents', 'error');
-      return;
-    }
-    await handleImportKeyringSubmit(data);
+  importKeyringBtn.addEventListener('click', () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    fileInput.addEventListener('change', async () => {
+      try {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const data = await fileInput.files[0].text();
+        await handleImportKeyringSubmit(data);
+      } catch (err) {
+        console.error('[NSS] Keyring file read error:', err);
+        showToast('✗ Could not read file: ' + err.message, 'error');
+      } finally {
+        document.body.removeChild(fileInput);
+      }
+    });
+
+    fileInput.click();
   });
 
   async function handleImportKeyringSubmit(data) {
@@ -534,28 +566,24 @@
     
     const file = e.dataTransfer.files[0];
     const text = await file.text();
+    console.log('[NSS] Drop:', file.name, 'length:', text.length);
 
     if (file.name.endsWith('.json')) {
-      const result = await nssPrompt('Import Keyring', [
-        { id: 'import-keyring', label: 'Keyring Contents', type: 'textarea', value: text }
-      ]);
-      if (result && result['import-keyring']) {
-        await handleImportKeyringSubmit(result['import-keyring']);
-      }
+      // Keyring import — just do it directly
+      await handleImportKeyringSubmit(text);
     } else {
-      let suggestedName = '';
-      if (file.name.startsWith('nss-') && file.name.endsWith('.nss')) {
-        suggestedName = `Contact ${file.name.substring(4, 12)}`;
-      } else {
-        suggestedName = file.name.replace('.nss', '');
+      // Contact key import — ask for name only
+      let suggestedName = file.name.replace(/\.(nss|txt|pem)$/i, '');
+      if (suggestedName.startsWith('nss-')) {
+        suggestedName = 'Contact ' + suggestedName.substring(4, 12);
       }
 
-      const result = await nssPrompt('Import Contact Key', [
-        { id: 'import-name', label: 'Contact Name (e.g. Alice)', placeholder: 'Alice', value: suggestedName },
-        { id: 'import-key', label: 'Public Key', type: 'textarea', value: text }
+      const result = await nssPrompt('Import Contact', [
+        { id: 'import-name', label: 'Contact Name', placeholder: 'e.g. Alice', value: suggestedName }
       ]);
-      if (result && result['import-name'] && result['import-key']) {
-        await handleImportContactSubmit(result['import-name'], result['import-key']);
+      if (result) {
+        const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
+        await handleImportContactSubmit(name, text);
       }
     }
   });
