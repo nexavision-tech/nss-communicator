@@ -10,7 +10,7 @@
   'use strict';
 
   const COMPOSER_ID = 'nss-composer-overlay';
-  const FOOTER_TEXT = '\n\n— Sent via NSS Communicator (nexavision.tech)';
+  const FOOTER_TEXT = '\n\n🏹 To read this secure message, install NSS Communicator:\nhttps://github.com/nexavision-tech/nss-communicator';
 
   // Remove existing composer to always start fresh (reloads contacts)
   if (document.getElementById(COMPOSER_ID)) {

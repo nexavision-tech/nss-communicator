@@ -108,8 +108,8 @@ const NSSEncrypt = (() => {
     // Encode payload as base64 JSON
     const payloadB64 = btoa(JSON.stringify(payload));
 
-    // Format: NSS:v1:<channel>:<fingerprint>:<payload>
-    return `${NSS_PREFIX}:${NSS_VERSION}:${channel}:${fingerprint}:${payloadB64}`;
+    // Format: >>--NSS:v1:<channel>:<fingerprint>:<payload>-->
+    return `>>--${NSS_PREFIX}:${NSS_VERSION}:${channel}:${fingerprint}:${payloadB64}-->`;
   }
 
   /**
@@ -121,7 +121,12 @@ const NSSEncrypt = (() => {
    * @returns {Promise<{plaintext: string, channel: number, senderFingerprint: string, verified: boolean}>}
    */
   async function decryptMessage(nssString, privateKey, senderPublicKey = null) {
-    const parts = nssString.split(':');
+    // Strip archer arrows before parsing
+    let cleanString = nssString.trim();
+    if (cleanString.startsWith('>>--')) cleanString = cleanString.substring(4);
+    if (cleanString.endsWith('-->')) cleanString = cleanString.substring(0, cleanString.length - 3);
+
+    const parts = cleanString.split(':');
 
     if (parts.length < 5 || parts[0] !== NSS_PREFIX) {
       throw new Error('Invalid NSS string format');
@@ -216,7 +221,7 @@ const NSSEncrypt = (() => {
    * @returns {boolean}
    */
   function isNSSString(str) {
-    return /^NSS:v1:\d{1,2}:[0-9a-f]{8}:/.test(str);
+    return /^>>--NSS:v1:\d{1,2}:[0-9a-f]{8}:/.test(str);
   }
 
   /**
@@ -225,7 +230,7 @@ const NSSEncrypt = (() => {
    * @returns {{version: string, channel: number, senderFingerprint: string}|null}
    */
   function parseHeader(nssString) {
-    const match = nssString.match(/^NSS:(v\d+):(\d{1,2}):([0-9a-f]{8}):/);
+    const match = nssString.match(/^>>--NSS:(v\d+):(\d{1,2}):([0-9a-f]{8}):/);
     if (!match) return null;
 
     return {

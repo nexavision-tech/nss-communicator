@@ -13,7 +13,7 @@
 
   // ── Configuration ──────────────────────────────────────────────────
 
-  const NSS_PATTERN = /NSS:v1:\d{1,2}:[0-9a-f]{8}:[A-Za-z0-9+/=]+/g;
+  const NSS_PATTERN = />>--NSS:v1:\d{1,2}:[0-9a-f]{8}:[A-Za-z0-9+/=]+-->/g;
   const NSS_CLASS = 'nss-encrypted';
   const NSS_PROCESSED_ATTR = 'data-nss-detected';
   const SCAN_DEBOUNCE_MS = 150;
@@ -34,7 +34,7 @@
     if (!text || text.length < 20) return;
 
     // Quick bail-out before running regex
-    if (text.indexOf('NSS:v1:') === -1) return;
+    if (text.indexOf('>>--NSS:v1:') === -1) return;
 
     const parent = textNode.parentNode;
     if (!parent) return;
