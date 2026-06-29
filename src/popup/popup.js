@@ -435,11 +435,14 @@
   importKeyBtn.addEventListener('click', async () => {
     const result = await nssPrompt('Import Contact Key', [
       { id: 'import-name', label: 'Contact Name (e.g. Alice)', placeholder: 'Alice' },
-      { id: 'import-key', label: 'Paste .nss Public Key', type: 'textarea', placeholder: '-----BEGIN PUBLIC KEY-----\n...' }
+      { id: 'import-file', label: 'Browse for .nss file (or drag here)', type: 'file', accept: '.nss,.txt' },
+      { id: 'import-key', label: 'OR Paste .nss Public Key', type: 'textarea', placeholder: '-----BEGIN PUBLIC KEY-----\n...' }
     ]);
     
-    if (!result || !result['import-name'] || !result['import-key']) return;
-    await handleImportContactSubmit(result['import-name'], result['import-key']);
+    if (!result || !result['import-name']) return;
+    const keyData = result['import-file'] || result['import-key'];
+    if (!keyData) return;
+    await handleImportContactSubmit(result['import-name'], keyData);
   });
 
   async function handleImportContactSubmit(name, keyData) {
@@ -477,11 +480,14 @@
 
   importKeyringBtn.addEventListener('click', async () => {
     const result = await nssPrompt('Import Keyring', [
-      { id: 'import-keyring', label: 'Paste nss-keyring.json contents', type: 'textarea' }
+      { id: 'import-file', label: 'Browse for nss-keyring.json', type: 'file', accept: '.json' },
+      { id: 'import-keyring', label: 'OR Paste nss-keyring.json contents', type: 'textarea' }
     ]);
     
-    if (!result || !result['import-keyring']) return;
-    await handleImportKeyringSubmit(result['import-keyring']);
+    if (!result) return;
+    const data = result['import-file'] || result['import-keyring'];
+    if (!data) return;
+    await handleImportKeyringSubmit(data);
   });
 
   async function handleImportKeyringSubmit(data) {
@@ -615,17 +621,28 @@
           <label for="${f.id}">${escapeHtml(f.label)}</label>
           ${f.type === 'textarea'
             ? `<textarea id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" rows="4" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; resize: vertical; font-family: monospace; font-size: 11px; margin-top: 4px;">${escapeHtml(f.value || '')}</textarea>`
+            : f.type === 'file'
+            ? `<input type="file" id="${f.id}" accept="${escapeHtml(f.accept || '')}" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; margin-top: 4px;">`
             : `<input type="${f.type || 'text'}" id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}" style="margin-top: 4px;">`
           }
         </div>
       `;
     });
     
-    return showModal(title, html, (resolve) => {
+    return showModal(title, html, async (resolve) => {
       const results = {};
-      fields.forEach(f => {
-        results[f.id] = document.getElementById(f.id).value;
-      });
+      for (const f of fields) {
+        const el = document.getElementById(f.id);
+        if (f.type === 'file') {
+          if (el.files && el.files.length > 0) {
+            results[f.id] = await el.files[0].text();
+          } else {
+            results[f.id] = null;
+          }
+        } else {
+          results[f.id] = el.value;
+        }
+      }
       resolve(results);
     });
   }
