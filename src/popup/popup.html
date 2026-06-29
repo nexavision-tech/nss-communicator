@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=350">
+  <title>NSS Communicator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="nss-popup">
+    <!-- Header -->
+    <header class="nss-header">
+      <div class="nss-logo">
+        <span class="nss-logo-icon">🔒</span>
+        <div class="nss-logo-text">
+          <h1>NSS Communicator</h1>
+          <span class="nss-subtitle">Not So Super Sneaky</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Identity Section -->
+    <section class="nss-section" id="identity-section">
+      <h2 class="nss-section-title">Identity</h2>
+
+      <!-- No Identity State -->
+      <div id="no-identity" class="nss-card" style="display: none;">
+        <p class="nss-muted">No identity key found. Generate one to start.</p>
+        <div class="nss-field">
+          <label for="generate-email">Email (optional)</label>
+          <input type="email" id="generate-email" placeholder="you@example.com">
+        </div>
+        <button id="generate-btn" class="nss-btn nss-btn-primary">
+          🔑 Generate Keys
+        </button>
+      </div>
+
+      <!-- Has Identity State -->
+      <div id="has-identity" class="nss-card" style="display: none;">
+        <div class="nss-identity-info">
+          <div class="nss-fingerprint">
+            <span class="nss-label">Fingerprint</span>
+            <code id="identity-fingerprint">--------</code>
+          </div>
+          <div class="nss-email">
+            <span class="nss-label">Email</span>
+            <span id="identity-email">—</span>
+          </div>
+        </div>
+        <div class="nss-identity-actions">
+          <button id="export-own-key-btn" class="nss-btn nss-btn-secondary" title="Export your .nss public key">
+            📤 Export .nss
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Compose Section -->
+    <section class="nss-section">
+      <button id="compose-btn" class="nss-btn nss-btn-primary nss-btn-full" disabled>
+        ✍️ Compose Message
+      </button>
+    </section>
+
+    <!-- Contacts Section -->
+    <section class="nss-section" id="contacts-section">
+      <div class="nss-section-header">
+        <h2 class="nss-section-title">Contacts</h2>
+        <span id="contact-count" class="nss-badge">0</span>
+      </div>
+
+      <div id="contact-list" class="nss-contact-list">
+        <p class="nss-muted nss-empty-state">No contacts yet</p>
+      </div>
+
+      <div class="nss-contact-actions">
+        <button id="import-key-btn" class="nss-btn nss-btn-secondary">
+          📥 Import .nss Key
+        </button>
+        <input type="file" id="import-key-file" accept=".nss,.txt" style="display: none;">
+      </div>
+    </section>
+
+    <!-- Keyring Section -->
+    <section class="nss-section">
+      <div class="nss-section-header">
+        <h2 class="nss-section-title">Keyring</h2>
+      </div>
+      <div class="nss-keyring-actions">
+        <button id="export-keyring-btn" class="nss-btn nss-btn-ghost">
+          💾 Export Keyring
+        </button>
+        <button id="import-keyring-btn" class="nss-btn nss-btn-ghost">
+          📂 Import Keyring
+        </button>
+        <input type="file" id="import-keyring-file" accept=".json" style="display: none;">
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="nss-footer">
+      <a href="https://nexavision.tech" target="_blank" rel="noopener">nexavision.tech</a>
+      <span class="nss-version">v0.1.0</span>
+    </footer>
+  </div>
+
+  <!-- Status Toast -->
+  <div id="nss-toast" class="nss-toast" style="display: none;">
+    <span id="nss-toast-text"></span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

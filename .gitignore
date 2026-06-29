@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.zip
+*.xpi
+web-ext-artifacts/
+.DS_Store
+Thumbs.db
+*.log
+.env
+*.pem
+*.ss

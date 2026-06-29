@@ -1,0 +1,426 @@
+/**
+ * NSS Communicator — Popup Styles
+ * Dark cyberpunk aesthetic matching NexaVision branding.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+/* ── Reset & Base ─────────────────────────────────────────────────── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 350px;
+  min-height: 400px;
+  background: #0a0e17;
+  color: #e0e0e0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* ── Popup Container ──────────────────────────────────────────────── */
+
+.nss-popup {
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+
+.nss-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #1a2035;
+  background: linear-gradient(180deg, #0f1520 0%, #0a0e17 100%);
+}
+
+.nss-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nss-logo-icon {
+  font-size: 24px;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 136, 0.4));
+}
+
+.nss-logo-text h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.nss-subtitle {
+  font-size: 10px;
+  color: #00ff88;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────── */
+
+.nss-section {
+  padding: 14px 20px;
+  border-bottom: 1px solid #111827;
+}
+
+.nss-section:last-of-type {
+  border-bottom: none;
+}
+
+.nss-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.nss-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #00ff88;
+  margin-bottom: 10px;
+}
+
+.nss-section-header .nss-section-title {
+  margin-bottom: 0;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────── */
+
+.nss-card {
+  background: #111827;
+  border: 1px solid #1a2035;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+/* ── Identity ─────────────────────────────────────────────────────── */
+
+.nss-identity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.nss-fingerprint code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  color: #00ff88;
+  background: #0a0e17;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.nss-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #666;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.nss-email span {
+  color: #999;
+}
+
+.nss-identity-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Fields ───────────────────────────────────────────────────────── */
+
+.nss-field {
+  margin-bottom: 12px;
+}
+
+.nss-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.nss-field input {
+  width: 100%;
+  background: #0a0e17;
+  border: 1px solid #1a2035;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 13px;
+  padding: 8px 10px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.nss-field input:focus {
+  outline: none;
+  border-color: #00ff88;
+}
+
+.nss-field input::placeholder {
+  color: #444;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+
+.nss-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.nss-btn-primary {
+  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+  color: #0a0e17;
+}
+
+.nss-btn-primary:hover {
+  box-shadow: 0 0 16px rgba(0, 255, 136, 0.3);
+}
+
+.nss-btn-primary:active {
+  transform: scale(0.97);
+}
+
+.nss-btn-primary:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.nss-btn-secondary {
+  background: #1a2035;
+  color: #00ff88;
+  border: 1px solid #00ff8833;
+}
+
+.nss-btn-secondary:hover {
+  background: #1f2940;
+  border-color: #00ff8866;
+}
+
+.nss-btn-ghost {
+  background: transparent;
+  color: #888;
+  border: 1px solid #1a2035;
+}
+
+.nss-btn-ghost:hover {
+  color: #00ff88;
+  border-color: #00ff8844;
+}
+
+.nss-btn-full {
+  width: 100%;
+  justify-content: center;
+  padding: 10px;
+  font-size: 13px;
+}
+
+.nss-btn-icon {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.nss-btn-icon:hover {
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+/* ── Badge ────────────────────────────────────────────────────────── */
+
+.nss-badge {
+  background: #00ff8822;
+  color: #00ff88;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ── Contact List ─────────────────────────────────────────────────── */
+
+.nss-contact-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.nss-contact-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.nss-contact-item:hover {
+  background: #111827;
+}
+
+.nss-contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.nss-contact-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nss-contact-fp {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 10px;
+  color: #00ff8899;
+}
+
+.nss-contact-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.nss-empty-state {
+  text-align: center;
+  padding: 12px;
+}
+
+/* ── Keyring Actions ──────────────────────────────────────────────── */
+
+.nss-keyring-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Muted Text ───────────────────────────────────────────────────── */
+
+.nss-muted {
+  color: #555;
+  font-size: 12px;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────── */
+
+.nss-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  border-top: 1px solid #111827;
+  margin-top: auto;
+}
+
+.nss-footer a {
+  color: #00ff88;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.nss-footer a:hover {
+  text-decoration: underline;
+}
+
+.nss-version {
+  font-size: 10px;
+  color: #444;
+  font-family: monospace;
+}
+
+/* ── Toast ────────────────────────────────────────────────────────── */
+
+.nss-toast {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: #1a2035;
+  border: 1px solid #00ff8844;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #e0e0e0;
+  text-align: center;
+  z-index: 1000;
+  animation: nss-toast-in 0.2s ease-out;
+}
+
+.nss-toast.success {
+  border-color: #00ff88;
+  color: #00ff88;
+}
+
+.nss-toast.error {
+  border-color: #ff4444;
+  color: #ff6666;
+}
+
+@keyframes nss-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a2035;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00ff8844;
+}
