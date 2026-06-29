@@ -108,8 +108,8 @@ const NSSEncrypt = (() => {
     // Encode payload as base64 JSON
     const payloadB64 = btoa(JSON.stringify(payload));
 
-    // Format: >>--NSS:v1:<channel>:<fingerprint>:<payload>-->
-    return `>>--${NSS_PREFIX}:${NSS_VERSION}:${channel}:${fingerprint}:${payloadB64}-->`;
+    // Format: >>--\nNSS:v1:<channel>:<fingerprint>:<payload>\n-->
+    return `>>--\n${NSS_PREFIX}:${NSS_VERSION}:${channel}:${fingerprint}:${payloadB64}\n-->`;
   }
 
   /**
@@ -224,7 +224,7 @@ const NSSEncrypt = (() => {
    * @returns {boolean}
    */
   function isNSSString(str) {
-    return /^>>--NSS:v1:\d{1,2}:[0-9a-f]{8}:/.test(str);
+    return /^>>--\s*NSS:v1:\d{1,2}:[0-9a-f]{8}:/.test(str.trim());
   }
 
   /**

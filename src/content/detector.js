@@ -13,7 +13,7 @@
 
   // ── Configuration ──────────────────────────────────────────────────
 
-  const NSS_PATTERN = />>--NSS:v1:\d{1,2}:[0-9a-f]{8}:[\s\S]*?-->/g;
+  const NSS_PATTERN = />>--\s*NSS:v1:\d{1,2}:[0-9a-f]{8}:[\s\S]*?-->/g;
   const NSS_CLASS = 'nss-encrypted';
   const NSS_PROCESSED_ATTR = 'data-nss-detected';
   const SCAN_DEBOUNCE_MS = 150;

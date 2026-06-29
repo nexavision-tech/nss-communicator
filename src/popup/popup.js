@@ -26,6 +26,7 @@
   const unlockBtn = document.getElementById('unlock-btn');
   const unlockPassphraseInput = document.getElementById('unlock-passphrase');
   const composeBtn = document.getElementById('compose-btn');
+  const decryptBtn = document.getElementById('decrypt-btn');
   const contactListEl = document.getElementById('contact-list');
   const contactCountEl = document.getElementById('contact-count');
   const importKeyBtn = document.getElementById('import-key-btn');
@@ -68,16 +69,19 @@
       identitySection.style.display = '';
       sections.forEach((s) => (s.style.display = 'none'));
       composeBtn.disabled = true;
+      decryptBtn.disabled = true;
     } else if (view === 'locked') {
       lockScreenEl.style.display = '';
       identitySection.style.display = 'none';
       sections.forEach((s) => (s.style.display = 'none'));
       composeBtn.disabled = true;
+      decryptBtn.disabled = true;
     } else if (view === 'unlocked') {
       hasIdentityEl.style.display = 'block';
       identitySection.style.display = '';
       sections.forEach((s) => (s.style.display = ''));
       composeBtn.disabled = false;
+      decryptBtn.disabled = false;
     }
   }
 
@@ -331,6 +335,50 @@
 
     encryptBtn.disabled = false;
     encryptBtn.textContent = isPublic ? '📡 Sign & Copy' : '🔐 Encrypt & Copy';
+  });
+
+  // ── Decrypt ────────────────────────────────────────────────────────
+
+  decryptBtn.addEventListener('click', async () => {
+    const idResp = await browser.runtime.sendMessage({ type: 'nss-get-identity' });
+    if (idResp.success && idResp.identity && idResp.identity.locked) {
+      showToast('✗ Keyring is locked — unlock first', 'error');
+      return;
+    }
+
+    const result = await nssPrompt('Decrypt Message', [
+      { id: 'decrypt-input', label: 'Paste NSS encrypted text', type: 'textarea', placeholder: '>>--\nNSS:v1:...' }
+    ]);
+    
+    if (!result || !result['decrypt-input']) return;
+
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: 'nss-decrypt',
+        nssString: result['decrypt-input'].trim()
+      });
+
+      if (response.success) {
+        // Show the decrypted message in another modal
+        const senderInfo = response.data.senderName !== 'Unknown' 
+          ? `From: ${escapeHtml(response.data.senderName)} (${escapeHtml(response.data.senderFingerprint)})` 
+          : `From Unknown Fingerprint: ${escapeHtml(response.data.senderFingerprint)}`;
+          
+        const verifiedIcon = response.data.verified ? '✅ Verified Signature' : '⚠️ Unverified';
+        
+        await showModal('🔓 Decrypted Message', `
+          <div style="margin-bottom: 12px; font-size: 12px; color: #b0b0b0;">
+            <div>${senderInfo}</div>
+            <div style="color: ${response.data.verified ? '#00ff88' : '#ffaa00'};">${verifiedIcon}</div>
+          </div>
+          <textarea readonly style="width: 100%; height: 120px; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #00ff88; color: #e0e0e0; resize: vertical; font-family: inherit;">${escapeHtml(response.data.plaintext)}</textarea>
+        `, (resolve) => resolve());
+      } else {
+        showToast('✗ ' + response.error, 'error');
+      }
+    } catch (err) {
+      showToast('✗ ' + err.message, 'error');
+    }
   });
 
   // ── Contacts ───────────────────────────────────────────────────────
