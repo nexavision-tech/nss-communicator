@@ -121,29 +121,23 @@ const NSSEncrypt = (() => {
    * @returns {Promise<{plaintext: string, channel: number, senderFingerprint: string, verified: boolean}>}
    */
   async function decryptMessage(nssString, privateKey, senderPublicKey = null) {
-    // Strip archer arrows before parsing
-    let cleanString = nssString.trim();
-    if (cleanString.startsWith('>>--')) cleanString = cleanString.substring(4);
-    if (cleanString.endsWith('-->')) cleanString = cleanString.substring(0, cleanString.length - 3);
-
-    // Remove zero-width spaces, newlines, and other whitespace social media might inject
-    cleanString = cleanString.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
-
-    const parts = cleanString.split(':');
-
-    if (parts.length < 5 || parts[0] !== NSS_PREFIX) {
+    // Extract the NSS payload using a regex that ignores everything before >>-- and after -->
+    const match = nssString.match(/>>--\s*NSS:(v\d+):(\d{1,2}):([0-9a-f]{8}):([\s\S]*?)-->/);
+    
+    if (!match) {
       throw new Error('Invalid NSS string format');
     }
 
-    const version = parts[1];
+    const version = match[1];
     if (version !== NSS_VERSION) {
       throw new Error(`Unsupported NSS version: ${version}`);
     }
 
-    const channel = parseInt(parts[2], 10);
-    const senderFingerprint = parts[3];
-    // Rejoin remaining parts in case payload contained colons (shouldn't in base64, but be safe)
-    const payloadB64 = parts.slice(4).join(':');
+    const channel = parseInt(match[2], 10);
+    const senderFingerprint = match[3];
+    
+    // Remove all whitespace from the base64 payload
+    const payloadB64 = match[4].replace(/[\s\u200B-\u200D\uFEFF]/g, '');
 
     const payload = JSON.parse(atob(payloadB64));
     const decoder = new TextDecoder();
@@ -233,7 +227,7 @@ const NSSEncrypt = (() => {
    * @returns {{version: string, channel: number, senderFingerprint: string}|null}
    */
   function parseHeader(nssString) {
-    const match = nssString.match(/^>>--NSS:(v\d+):(\d{1,2}):([0-9a-f]{8}):/);
+    const match = nssString.match(/>>--\s*NSS:(v\d+):(\d{1,2}):([0-9a-f]{8}):/);
     if (!match) return null;
 
     return {
