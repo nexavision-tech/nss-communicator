@@ -439,13 +439,16 @@
     ]);
     
     if (!result || !result['import-name'] || !result['import-key']) return;
+    await handleImportContactSubmit(result['import-name'], result['import-key']);
+  });
 
+  async function handleImportContactSubmit(name, keyData) {
     try {
       const response = await browser.runtime.sendMessage({
         type: 'nss-import-key',
-        name: result['import-name'].trim(),
+        name: name.trim(),
         email: '',
-        keyData: result['import-key'].trim()
+        keyData: keyData.trim()
       });
 
       if (response.success) {
@@ -457,7 +460,7 @@
     } catch (err) {
       showToast('✗ ' + err.message, 'error');
     }
-  });
+  }
 
   // ── Keyring Import/Export ──────────────────────────────────────────
 
@@ -478,11 +481,14 @@
     ]);
     
     if (!result || !result['import-keyring']) return;
+    await handleImportKeyringSubmit(result['import-keyring']);
+  });
 
+  async function handleImportKeyringSubmit(data) {
     try {
       const response = await browser.runtime.sendMessage({
         type: 'nss-import-keyring',
-        data: result['import-keyring'].trim()
+        data: data.trim()
       });
 
       if (response.success) {
@@ -494,6 +500,46 @@
       }
     } catch (err) {
       showToast('✗ ' + err.message, 'error');
+    }
+  }
+
+  // ── Drag & Drop ────────────────────────────────────────────────────
+
+  document.body.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.body.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    
+    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+    
+    const file = e.dataTransfer.files[0];
+    const text = await file.text();
+
+    if (file.name.endsWith('.json')) {
+      const result = await nssPrompt('Import Keyring', [
+        { id: 'import-keyring', label: 'Keyring Contents', type: 'textarea', value: text }
+      ]);
+      if (result && result['import-keyring']) {
+        await handleImportKeyringSubmit(result['import-keyring']);
+      }
+    } else {
+      let suggestedName = '';
+      if (file.name.startsWith('nss-') && file.name.endsWith('.nss')) {
+        suggestedName = `Contact ${file.name.substring(4, 12)}`;
+      } else {
+        suggestedName = file.name.replace('.nss', '');
+      }
+
+      const result = await nssPrompt('Import Contact Key', [
+        { id: 'import-name', label: 'Contact Name (e.g. Alice)', placeholder: 'Alice', value: suggestedName },
+        { id: 'import-key', label: 'Public Key', type: 'textarea', value: text }
+      ]);
+      if (result && result['import-name'] && result['import-key']) {
+        await handleImportContactSubmit(result['import-name'], result['import-key']);
+      }
     }
   });
 
@@ -568,7 +614,7 @@
         <div class="nss-field">
           <label for="${f.id}">${escapeHtml(f.label)}</label>
           ${f.type === 'textarea'
-            ? `<textarea id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" rows="4" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; resize: vertical; font-family: monospace; font-size: 11px; margin-top: 4px;"></textarea>`
+            ? `<textarea id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" rows="4" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; resize: vertical; font-family: monospace; font-size: 11px; margin-top: 4px;">${escapeHtml(f.value || '')}</textarea>`
             : `<input type="${f.type || 'text'}" id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}" style="margin-top: 4px;">`
           }
         </div>
