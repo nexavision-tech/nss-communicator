@@ -179,16 +179,25 @@
   // ── Change Passphrase ──────────────────────────────────────────────
 
   changePassphraseBtn.addEventListener('click', async () => {
-    const currentPassphrase = prompt('Enter current passphrase:');
+    const result = await nssPrompt('Change Passphrase', [
+      { id: 'cp-current', label: 'Current Passphrase', type: 'password' },
+      { id: 'cp-new', label: 'New Passphrase (min 8 chars)', type: 'password' },
+      { id: 'cp-confirm', label: 'Confirm New Passphrase', type: 'password' }
+    ]);
+    
+    if (!result) return;
+    
+    const currentPassphrase = result['cp-current'];
+    const newPassphrase = result['cp-new'];
+    const confirmNew = result['cp-confirm'];
+
     if (!currentPassphrase) return;
 
-    const newPassphrase = prompt('Enter new passphrase (min 8 chars):');
     if (!newPassphrase || newPassphrase.length < 8) {
       showToast('✗ New passphrase must be at least 8 characters', 'error');
       return;
     }
 
-    const confirmNew = prompt('Confirm new passphrase:');
     if (newPassphrase !== confirmNew) {
       showToast('✗ Passphrases do not match', 'error');
       return;
@@ -277,7 +286,8 @@
     contactListEl.querySelectorAll('.nss-contact-remove').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         const fp = e.target.getAttribute('data-fp');
-        if (confirm(`Remove contact ${fp}?`)) {
+        const confirmed = await nssConfirm('Remove Contact', `Are you sure you want to remove contact ${fp}?`);
+        if (confirmed) {
           const resp = await browser.runtime.sendMessage({
             type: 'nss-remove-contact',
             fingerprint: fp,
@@ -302,10 +312,17 @@
     if (!file) return;
 
     const text = await file.text();
-    const name = prompt('Name for this contact:', file.name.replace(/\.nss$/, ''));
-    if (!name) return;
+    importKeyFile.value = '';
 
-    const email = prompt('Email (optional):', '') || '';
+    const result = await nssPrompt('Import Contact', [
+      { id: 'ik-name', label: 'Name for this contact:', value: file.name.replace(/\.nss$/, '') },
+      { id: 'ik-email', label: 'Email (optional):', placeholder: 'you@example.com' }
+    ]);
+    
+    if (!result || !result['ik-name']) return;
+    
+    const name = result['ik-name'];
+    const email = result['ik-email'] || '';
 
     const response = await browser.runtime.sendMessage({
       type: 'nss-import-key',
@@ -320,8 +337,6 @@
     } else {
       showToast('✗ ' + response.error, 'error');
     }
-
-    importKeyFile.value = '';
   });
 
   // ── Keyring Import/Export ──────────────────────────────────────────
@@ -393,6 +408,64 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // ── Custom Modals ──────────────────────────────────────────────────
+
+  function showModal(title, bodyHtml, onConfirm) {
+    const modal = document.getElementById('nss-modal');
+    document.getElementById('nss-modal-title').textContent = title;
+    document.getElementById('nss-modal-body').innerHTML = bodyHtml;
+    
+    modal.style.display = 'flex';
+    
+    return new Promise((resolve) => {
+      const confirmBtn = document.getElementById('nss-modal-confirm');
+      const cancelBtn = document.getElementById('nss-modal-cancel');
+      
+      const cleanup = () => {
+        modal.style.display = 'none';
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+      
+      confirmBtn.onclick = () => {
+        cleanup();
+        onConfirm(resolve);
+      };
+      
+      cancelBtn.onclick = () => {
+        cleanup();
+        resolve(null);
+      };
+    });
+  }
+
+  function nssPrompt(title, fields) {
+    let html = '';
+    fields.forEach(f => {
+      html += `
+        <div class="nss-field">
+          <label for="${f.id}">${escapeHtml(f.label)}</label>
+          <input type="${f.type || 'text'}" id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}">
+        </div>
+      `;
+    });
+    
+    return showModal(title, html, (resolve) => {
+      const results = {};
+      fields.forEach(f => {
+        results[f.id] = document.getElementById(f.id).value;
+      });
+      resolve(results);
+    });
+  }
+
+  function nssConfirm(title, message) {
+    const html = `<p class="nss-muted">${escapeHtml(message)}</p>`;
+    return showModal(title, html, (resolve) => {
+      resolve(true);
+    });
   }
 
   // ── Boot ───────────────────────────────────────────────────────────

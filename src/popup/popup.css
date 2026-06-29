@@ -451,6 +451,41 @@ body {
   }
 }
 
+/* ── Modal ────────────────────────────────────────────────────────── */
+
+.nss-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(10, 14, 23, 0.85);
+  backdrop-filter: blur(2px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.nss-modal-card {
+  width: 100%;
+  box-shadow: 0 4px 20px rgba(0, 255, 136, 0.15);
+}
+
+.nss-modal-title {
+  font-size: 14px;
+  color: #00ff88;
+  margin-bottom: 12px;
+}
+
+.nss-modal-body {
+  margin-bottom: 16px;
+}
+
+.nss-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
