@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NSS Communicator — Crypto Test Harness</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0e17;
+      color: #e0e0e0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 { color: #00ff88; margin-bottom: 10px; }
+    h2 { color: #00cc6a; margin: 20px 0 10px; font-size: 1.1em; }
+    .subtitle { color: #666; margin-bottom: 30px; }
+    .test-section {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .test-section.pass { border-color: #00ff88; }
+    .test-section.fail { border-color: #ff4444; }
+    button {
+      background: #00ff88;
+      color: #0a0e17;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: inherit;
+      margin: 5px 5px 5px 0;
+    }
+    button:hover { background: #00cc6a; }
+    button:disabled { background: #333; color: #666; cursor: not-allowed; }
+    button.danger { background: #ff4444; color: white; }
+    .log {
+      background: #0d1117;
+      border: 1px solid #1e293b;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log .ok { color: #00ff88; }
+    .log .err { color: #ff4444; }
+    .log .info { color: #66b3ff; }
+    .log .warn { color: #ffaa00; }
+    input, textarea {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e0e0e0;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: inherit;
+      width: 100%;
+      margin: 5px 0;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .badge.pass { background: #00ff8833; color: #00ff88; }
+    .badge.fail { background: #ff444433; color: #ff4444; }
+    .badge.running { background: #ffaa0033; color: #ffaa00; }
+    #summary {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #111827;
+      border: 1px solid #1e293b;
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔐 NSS Crypto Test Harness</h1>
+  <p class="subtitle">Standalone verification — no extension required. Open in any browser.</p>
+
+  <div id="summary">
+    <span id="pass-count" class="badge pass">0 passed</span>
+    <span id="fail-count" class="badge fail">0 failed</span>
+  </div>
+
+  <!-- Test 1: Key Generation -->
+  <div class="test-section" id="test-keygen">
+    <h2>1. Key Generation (RSA-4096)</h2>
+    <button onclick="testKeyGen()">🔑 Generate Keys</button>
+    <div class="log" id="log-keygen"></div>
+  </div>
+
+  <!-- Test 2: Key Export/Import -->
+  <div class="test-section" id="test-export">
+    <h2>2. Key Export → Import Round-Trip</h2>
+    <button onclick="testExportImport()" id="btn-export" disabled>📤 Test Export/Import</button>
+    <div class="log" id="log-export"></div>
+  </div>
+
+  <!-- Test 3: Fingerprint -->
+  <div class="test-section" id="test-fingerprint">
+    <h2>3. Fingerprint Generation</h2>
+    <button onclick="testFingerprint()" id="btn-fingerprint" disabled>🔍 Test Fingerprint</button>
+    <div class="log" id="log-fingerprint"></div>
+  </div>
+
+  <!-- Test 4: Channel 0 (Sign-Only) -->
+  <div class="test-section" id="test-ch0">
+    <h2>4. Channel 0 — Public Broadcast (Sign-Only)</h2>
+    <input type="text" id="ch0-message" value="Hello from NexaVision! This is a signed public broadcast. 📡">
+    <button onclick="testChannel0()" id="btn-ch0" disabled>📡 Test Channel 0</button>
+    <div class="log" id="log-ch0"></div>
+  </div>
+
+  <!-- Test 5: Encrypted Channel -->
+  <div class="test-section" id="test-encrypted">
+    <h2>5. Encrypted Channel (Alice → Bob)</h2>
+    <input type="text" id="enc-message" value="Not so super sneaky! 🔐 This message is AES-256-GCM encrypted.">
+    <button onclick="testEncrypted()" id="btn-encrypted" disabled>🔒 Test Encrypt/Decrypt</button>
+    <div class="log" id="log-encrypted"></div>
+  </div>
+
+  <!-- Test 6: Keyring (PBKDF2 Wrapping) -->
+  <div class="test-section" id="test-keyring">
+    <h2>6. Keyring — Passphrase Key Wrapping (PBKDF2 + AES-256-GCM)</h2>
+    <div class="row">
+      <input type="password" id="kr-passphrase" value="testpassword123!" placeholder="Test passphrase" style="width: 300px;">
+    </div>
+    <button onclick="testKeyring()" id="btn-keyring" disabled>🔒 Test Keyring</button>
+    <div class="log" id="log-keyring"></div>
+  </div>
+
+  <!-- Test 7: Full E2E -->
+  <div class="test-section" id="test-e2e">
+    <h2>7. Full End-to-End Test</h2>
+    <textarea id="e2e-message" placeholder="Type a message...">The EFF just published new findings on surveillance. Discuss in Channel 7. 🔐</textarea>
+    <button onclick="testE2E()" id="btn-e2e" disabled>🚀 Run Full E2E</button>
+    <div class="log" id="log-e2e"></div>
+  </div>
+
+  <!-- Interactive Sandbox -->
+  <div class="test-section">
+    <h2>🧪 Interactive Sandbox</h2>
+    <textarea id="sandbox-input" placeholder="Paste an NSS string here to decode..."></textarea>
+    <button onclick="decodeSandbox()">Decode</button>
+    <div class="log" id="log-sandbox"></div>
+  </div>
+
+  <!-- Load crypto modules -->
+  <script src="../src/crypto/keys.js"></script>
+  <script src="../src/crypto/encrypt.js"></script>
+  <script>
+    // ── State ──────────────────────────────────────────────────────────
+    let aliceKeys = null;
+    let bobKeys = null;
+    let passed = 0;
+    let failed = 0;
+
+    function log(id, msg, cls = '') {
+      const el = document.getElementById(id);
+      const line = document.createElement('div');
+      line.className = cls;
+      line.textContent = `[${new Date().toISOString().slice(11,19)}] ${msg}`;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function updateSummary() {
+      document.getElementById('pass-count').textContent = `${passed} passed`;
+      document.getElementById('fail-count').textContent = `${failed} failed`;
+    }
+
+    function markSection(id, pass) {
+      const el = document.getElementById(id);
+      el.classList.add(pass ? 'pass' : 'fail');
+      if (pass) passed++; else failed++;
+      updateSummary();
+    }
+
+    // ── Test 1: Key Generation ────────────────────────────────────────
+    async function testKeyGen() {
+      const logId = 'log-keygen';
+      try {
+        log(logId, 'Generating Alice RSA-4096 keypair...', 'info');
+        const t0 = performance.now();
+        aliceKeys = await NSSKeys.generateKeyPair();
+        const t1 = performance.now();
+        log(logId, `✅ Alice keypair generated in ${(t1-t0).toFixed(0)}ms`, 'ok');
+
+        log(logId, 'Generating Bob RSA-4096 keypair...', 'info');
+        const t2 = performance.now();
+        bobKeys = await NSSKeys.generateKeyPair();
+        const t3 = performance.now();
+        log(logId, `✅ Bob keypair generated in ${(t3-t2).toFixed(0)}ms`, 'ok');
+
+        log(logId, `Total: ${((t3-t2)+(t1-t0)).toFixed(0)}ms for 2x RSA-4096 pairs (4 keys)`, 'info');
+
+        // Enable next tests
+        ['btn-export','btn-fingerprint','btn-ch0','btn-encrypted','btn-keyring','btn-e2e'].forEach(
+          id => document.getElementById(id).disabled = false
+        );
+
+        markSection('test-keygen', true);
+      } catch (e) {
+        log(logId, `❌ ${e.message}`, 'err');
+        markSection('test-keygen', false);
+      }
+    }
+
+    // ── Test 2: Export/Import ──────────────────────────────────────────
+    async function testExportImport() {
+      const logId = 'log-export';
+      try {
+        log(logId, 'Exporting Alice public key (.nss)...', 'info');
+        const nssStr = await NSSKeys.exportPublicKey(aliceKeys);
+        log(logId, `Public key (${nssStr.length} chars):\n${nssStr.slice(0, 120)}...`, 'info');
+
+        log(logId, 'Exporting Alice private key (.ss)...', 'info');
+        const ssStr = await NSSKeys.exportPrivateKey(aliceKeys);
+        log(logId, `Private key (${ssStr.length} chars): [REDACTED]`, 'warn');
+
+        log(logId, 'Re-importing public key...', 'info');
+        const imported = await NSSKeys.importPublicKey(nssStr);
+        log(logId, '✅ Public key re-imported successfully', 'ok');
+
+        log(logId, 'Re-importing private key...', 'info');
+        const importedPriv = await NSSKeys.importPrivateKey(ssStr);
+        log(logId, '✅ Private key re-imported successfully', 'ok');
+
+        // Verify: encrypt with original, decrypt with imported
+        const testData = new TextEncoder().encode('round-trip test');
+        const ct = await crypto.subtle.encrypt({name:'RSA-OAEP'}, aliceKeys.encrypt.publicKey, testData);
+        const pt = await crypto.subtle.decrypt({name:'RSA-OAEP'}, importedPriv.encrypt, ct);
+        const result = new TextDecoder().decode(pt);
+
+        if (result === 'round-trip test') {
+          log(logId, '✅ Round-trip encrypt/decrypt verified', 'ok');
+          markSection('test-export', true);
+        } else {
+          throw new Error('Round-trip mismatch');
+        }
+      } catch (e) {
+        log(logId, `❌ ${e.message}`, 'err');
+        markSection('test-export', false);
+      }
+    }
+
+    // ── Test 3: Fingerprint ───────────────────────────────────────────
+    async function testFingerprint() {
+      const logId = 'log-fingerprint';
+      try {
+        const aliceFP = await NSSKeys.getFingerprint({
+          encrypt: aliceKeys.encrypt.publicKey,
+          sign: aliceKeys.sign.publicKey,
+        });
+        log(logId, `Alice fingerprint: ${aliceFP}`, 'ok');
+
+        const bobFP = await NSSKeys.getFingerprint({
+          encrypt: bobKeys.encrypt.publicKey,
+          sign: bobKeys.sign.publicKey,
+        });
+        log(logId, `Bob fingerprint: ${bobFP}`, 'ok');
+
+        if (aliceFP !== bobFP) {
+          log(logId, '✅ Fingerprints are unique', 'ok');
+          markSection('test-fingerprint', true);
+        } else {
+          throw new Error('Fingerprints should differ!');
+        }
+      } catch (e) {
+        log(logId, `❌ ${e.message}`, 'err');
+        markSection('test-fingerprint', false);
+      }
+    }
+
+    // ── Test 4: Channel 0 (Sign-Only) ─────────────────────────────────
+    async function testChannel0() {
+      const logId = 'log-ch0';
+      try {
+        const msg = document.getElementById('ch0-message').value;
+        log(logId, `Signing message: "${msg}"`, 'info');
+
+        const alicePub = { encrypt: aliceKeys.encrypt.publicKey, sign: aliceKeys.sign.publicKey };
+        const alicePriv = { encrypt: aliceKeys.encrypt.privateKey, sign: aliceKeys.sign.privateKey };
+
+        const nssStr = await NSSEncrypt.encryptMessage(msg, alicePub, alicePriv, alicePub, 0);
+        log(logId, `NSS string (${nssStr.length} chars):`, 'info');
+        log(logId, nssStr.slice(0, 100) + '...', 'info');
+
+        // Verify header
+        const header = NSSEncrypt.parseHeader(nssStr);
+        log(logId, `Channel: ${header.channel}, Sender: ${header.senderFingerprint}`, 'info');
+
+        // Decrypt (anyone can read channel 0)
+        const result = await NSSEncrypt.decryptMessage(nssStr, alicePriv, alicePub);
+        log(logId, `Decrypted: "${result.plaintext}"`, 'ok');
+        log(logId, `Verified: ${result.verified}`, result.verified ? 'ok' : 'warn');
+
+        if (result.plaintext === msg && result.verified) {
+          log(logId, '✅ Channel 0 sign/verify passed', 'ok');
+          markSection('test-ch0', true);
+        } else {
+          throw new Error('Verification failed');
+        }
+      } catch (e) {
+        log(logId, `❌ ${e.message}`, 'err');
+        markSection('test-ch0', false);
+      }
+    }
+
+    // ── Test 5: Encrypted ─────────────────────────────────────────────
+    async function testEncrypted() {
+      const logId = 'log-encrypted';
+      try {
+        const msg = document.getElementById('enc-message').value;
+        log(logId, `Alice → Bob: "${msg}"`, 'info');
+
+        const alicePub = { encrypt: aliceKeys.encrypt.publicKey, sign: aliceKeys.sign.publicKey };
+        const alicePriv = { encrypt: aliceKeys.encrypt.privateKey, sign: aliceKeys.sign.privateKey };
+        const bobPub = { encrypt: bobKeys.encrypt.publicKey, sign: bobKeys.sign.publicKey };
+        const bobPriv = { encrypt: bobKeys.encrypt.privateKey, sign: bobKeys.sign.privateKey };
+
+        // Alice encrypts for Bob on channel 5
+        const nssStr = await NSSEncrypt.encryptMessage(msg, bobPub, alicePriv, alicePub, 5);
+        log(logId, `Encrypted (${nssStr.length} chars):`, 'info');
+        log(logId, nssStr.slice(0, 80) + '...', 'info');
+
+        // Bob decrypts
+        const result = await NSSEncrypt.decryptMessage(nssStr, bobPriv, alicePub);
+        log(logId, `Bob decrypted: "${result.plaintext}"`, 'ok');
+        log(logId, `Channel: ${result.channel}, Verified: ${result.verified}`, 'ok');
+
+        // Verify Alice can't decrypt Bob's message (wrong private key)
+        try {
+          await NSSEncrypt.decryptMessage(nssStr, alicePriv, alicePub);
+          log(logId, '⚠️ Alice could decrypt — this should fail!', 'warn');
+        } catch (e) {
+          log(logId, '✅ Alice cannot decrypt Bob\'s message (correct behavior)', 'ok');
+        }
+
+        if (result.plaintext === msg && result.verified && result.channel === 5) {
+          log(logId, '✅ Encrypted channel test passed', 'ok');
+          markSection('test-encrypted', true);
+        } else {
+          throw new Error('Decryption mismatch');
+        }
+      } catch (e) {
+        log(logId, `❌ ${e.message}`, 'err');
+        markSection('test-encrypted', false);
+      }
+    }
+
+    // ── Test 6: Keyring (PBKDF2) ──────────────────────────────────────
+    async function testKeyring() {
+      const logId = 'log-keyring';
+      try {
+        log(logId, 'Testing PBKDF2 key derivation...', 'info');
+        const passphrase = document.getElementById('kr-passphrase').value;
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+
+        // Derive wrapping key
+        const t0 = performance.now();
+        const keyMaterial = await crypto.subtle.importKey(
+          'raw', new TextEncoder().encode(passphrase),
+          { name: 'PBKDF2' }, false, ['deriveKey']
+        );
+        const wrappingKey = await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+          keyMaterial,
+          { name: 'AES-GCM', length: 256 },
+          false, ['encrypt', 'decrypt']
+        );
+        const t1 = performance.now();
+        log(logId, `✅ PBKDF2 derivation: ${(t1-t0).toFixed(0)}ms (100K iterations)`, 'ok');
+
+        // Wrap a test key
+        const testData = new TextEncoder().encode('super-secret-private-key-data-here');
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrappingKey, testData);
+        log(logId, `✅ Wrapped: ${ct.byteLength} bytes ciphertext`, 'ok');
+
+        // Unwrap
+        const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, wrappingKey, ct);
+        const result = new TextDecoder().decode(pt);
+        log(logId, `✅ Unwrapped: "${result}"`, 'ok');
+
+        // Wrong passphrase should fail
+        const wrongMaterial = await crypto.subtle.importKey(
+          'raw', new TextEncoder().encode('wrong-password'),
+          { name: 'PBKDF2' }, false, ['deriveKey']
+        );
+        const wrongKey = await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+          wrongMaterial,
+          { name: 'AES-GCM', length: 256 },
+          false, ['encrypt', 'decrypt']
+        );
+        try {
+          await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, wrongKey, ct);
+          log(logId, '⚠️ Wrong passphrase decrypted — should fail!', 'warn');
+        } catch (e) {
+          log(logId, '✅ Wrong passphrase correctly rejected', 'ok');
+        }
+
+        markSection('test-keyring', true);
+      } catch (e) {
+        log(logId, `❌ ${e.message}`, 'err');
+        markSection('test-keyring', false);
+      }
+    }
+
+    // ── Test 7: Full E2E ──────────────────────────────────────────────
+    async function testE2E() {
+      const logId = 'log-e2e';
+      try {
+        const msg = document.getElementById('e2e-message').value;
+        log(logId, '═══ Full E2E: Alice generates → exports → encrypts → posts → Bob decrypts ═══', 'info');
+
+        // Step 1: Alice generates keys
+        log(logId, '1. Alice generates RSA-4096 keypair...', 'info');
+        const alice = await NSSKeys.generateKeyPair();
+        const alicePub = { encrypt: alice.encrypt.publicKey, sign: alice.sign.publicKey };
+        const alicePriv = { encrypt: alice.encrypt.privateKey, sign: alice.sign.privateKey };
+        const aliceFP = await NSSKeys.getFingerprint(alicePub);
+        log(logId, `   Alice fingerprint: ${aliceFP}`, 'ok');
+
+        // Step 2: Bob generates keys
+        log(logId, '2. Bob generates RSA-4096 keypair...', 'info');
+        const bob = await NSSKeys.generateKeyPair();
+        const bobPub = { encrypt: bob.encrypt.publicKey, sign: bob.sign.publicKey };
+        const bobPriv = { encrypt: bob.encrypt.privateKey, sign: bob.sign.privateKey };
+        const bobFP = await NSSKeys.getFingerprint(bobPub);
+        log(logId, `   Bob fingerprint: ${bobFP}`, 'ok');
+
+        // Step 3: Exchange public keys
+        log(logId, '3. Exchanging .nss files...', 'info');
+        const aliceNSS = await NSSKeys.exportPublicKey(alice);
+        const bobNSS = await NSSKeys.exportPublicKey(bob);
+        const importedBobPub = await NSSKeys.importPublicKey(bobNSS);
+        const importedAlicePub = await NSSKeys.importPublicKey(aliceNSS);
+        log(logId, '   ✅ Keys exchanged', 'ok');
+
+        // Step 4: Alice encrypts on channel 7
+        log(logId, `4. Alice encrypts on CH7: "${msg.slice(0, 50)}..."`, 'info');
+        const nssString = await NSSEncrypt.encryptMessage(msg, importedBobPub, alicePriv, alicePub, 7);
+        log(logId, `   NSS string length: ${nssString.length}`, 'info');
+
+        // Step 5: Simulate posting to social media
+        log(logId, '5. 📝 Alice posts to Facebook:', 'info');
+        log(logId, `   ${nssString.slice(0, 60)}...`, 'info');
+        log(logId, '   🔐 nexavision.tech/nss — decrypt this message', 'info');
+
+        // Step 6: Bob's NSS detector finds it
+        log(logId, '6. 🔍 Bob\'s NSS detector scans the page...', 'info');
+        const isNSS = NSSEncrypt.isNSSString(nssString);
+        const header = NSSEncrypt.parseHeader(nssString);
+        log(logId, `   Detected: ${isNSS}, Channel: ${header.channel}, Sender: ${header.senderFingerprint}`, 'ok');
+
+        // Step 7: Bob decrypts
+        log(logId, '7. 🔓 Bob decrypts...', 'info');
+        const result = await NSSEncrypt.decryptMessage(nssString, bobPriv, importedAlicePub);
+        log(logId, `   Plaintext: "${result.plaintext}"`, 'ok');
+        log(logId, `   Verified: ${result.verified} ✅`, 'ok');
+        log(logId, `   Channel: ${result.channel}`, 'ok');
+
+        // Final check
+        if (result.plaintext === msg && result.verified && result.channel === 7) {
+          log(logId, '', '');
+          log(logId, '═══════════════════════════════════════════', 'ok');
+          log(logId, '  🎉 FULL E2E TEST PASSED — NSS IS OPERATIONAL', 'ok');
+          log(logId, '═══════════════════════════════════════════', 'ok');
+          markSection('test-e2e', true);
+        } else {
+          throw new Error('E2E mismatch');
+        }
+      } catch (e) {
+        log(logId, `❌ ${e.message}`, 'err');
+        markSection('test-e2e', false);
+      }
+    }
+
+    // ── Sandbox ───────────────────────────────────────────────────────
+    async function decodeSandbox() {
+      const logId = 'log-sandbox';
+      const input = document.getElementById('sandbox-input').value.trim();
+      try {
+        if (NSSEncrypt.isNSSString(input)) {
+          const header = NSSEncrypt.parseHeader(input);
+          log(logId, `Version: ${header.version}`, 'info');
+          log(logId, `Channel: ${header.channel}`, 'info');
+          log(logId, `Sender: ${header.senderFingerprint}`, 'info');
+          log(logId, 'Note: Cannot decrypt without the right private key', 'warn');
+        } else {
+          log(logId, 'Not a valid NSS string', 'warn');
+        }
+      } catch (e) {
+        log(logId, `Error: ${e.message}`, 'err');
+      }
+    }
+  </script>
+</body>
+</html>
