@@ -439,10 +439,14 @@
       { id: 'import-key', label: 'OR Paste .nss Public Key', type: 'textarea', placeholder: '-----BEGIN PUBLIC KEY-----\n...' }
     ]);
     
-    if (!result || !result['import-name']) return;
+    if (!result) return;
     const keyData = result['import-file'] || result['import-key'];
-    if (!keyData) return;
-    await handleImportContactSubmit(result['import-name'], keyData);
+    if (!keyData) {
+      showToast('✗ Please select a file or paste a key', 'error');
+      return;
+    }
+    const name = result['import-name'] ? result['import-name'].trim() : 'Unknown Contact';
+    await handleImportContactSubmit(name, keyData);
   });
 
   async function handleImportContactSubmit(name, keyData) {
@@ -486,7 +490,10 @@
     
     if (!result) return;
     const data = result['import-file'] || result['import-keyring'];
-    if (!data) return;
+    if (!data) {
+      showToast('✗ Please select a file or paste contents', 'error');
+      return;
+    }
     await handleImportKeyringSubmit(data);
   });
 
