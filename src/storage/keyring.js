@@ -1,9 +1,19 @@
 /**
- * NSS Communicator — IndexedDB Key Storage (Keyring)
- * Manages identity keypairs and imported contact public keys.
+ * NSS Communicator — Secure IndexedDB Key Storage (Keyring)
+ *
+ * CRITICAL SECURITY: Private keys are NEVER stored in plaintext.
+ * They are wrapped (encrypted) using a key derived from the user's
+ * passphrase via PBKDF2 (100,000 iterations) + AES-256-GCM.
+ *
+ * Flow:
+ *   1. User sets a passphrase on first key generation
+ *   2. PBKDF2 derives a wrapping key from passphrase + random salt
+ *   3. Private keys are encrypted with AES-256-GCM using the wrapping key
+ *   4. Only the encrypted blob + salt + iv are stored in IndexedDB
+ *   5. To use keys, user must "unlock" the keyring with their passphrase
  *
  * Stores:
- *   'identity' — User's own keypair (encrypt + sign key pairs)
+ *   'identity' — User's wrapped private key + plaintext public key
  *   'contacts' — Imported public keys indexed by fingerprint
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -13,86 +23,175 @@ const NSSKeyring = (() => {
   'use strict';
 
   const DB_NAME = 'nss-keyring';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE_IDENTITY = 'identity';
   const STORE_CONTACTS = 'contacts';
+  const PBKDF2_ITERATIONS = 100000;
 
   let _db = null;
+  let _wrappingKey = null;  // Derived from passphrase, lives in memory only
 
-  /**
-   * Open or create the IndexedDB keyring database.
-   * @returns {Promise<IDBDatabase>}
-   */
+  // ── Database ──────────────────────────────────────────────────────
+
   function initKeyring() {
     return new Promise((resolve, reject) => {
-      if (_db) {
-        resolve(_db);
-        return;
-      }
+      if (_db) { resolve(_db); return; }
 
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
-
-        // Identity store — single record with key 'primary'
         if (!db.objectStoreNames.contains(STORE_IDENTITY)) {
           db.createObjectStore(STORE_IDENTITY, { keyPath: 'id' });
         }
-
-        // Contacts store — indexed by fingerprint
         if (!db.objectStoreNames.contains(STORE_CONTACTS)) {
-          const contactStore = db.createObjectStore(STORE_CONTACTS, { keyPath: 'fingerprint' });
-          contactStore.createIndex('name', 'name', { unique: false });
-          contactStore.createIndex('email', 'email', { unique: false });
-          contactStore.createIndex('addedAt', 'addedAt', { unique: false });
+          const cs = db.createObjectStore(STORE_CONTACTS, { keyPath: 'fingerprint' });
+          cs.createIndex('name', 'name', { unique: false });
+          cs.createIndex('email', 'email', { unique: false });
         }
       };
 
-      request.onsuccess = (event) => {
-        _db = event.target.result;
-        resolve(_db);
-      };
-
-      request.onerror = (event) => {
-        reject(new Error(`Failed to open keyring: ${event.target.error}`));
-      };
+      request.onsuccess = (event) => { _db = event.target.result; resolve(_db); };
+      request.onerror = (event) => { reject(new Error(`Keyring open failed: ${event.target.error}`)); };
     });
   }
 
-  /**
-   * Helper: execute a transaction operation.
-   * @param {string} storeName
-   * @param {string} mode — 'readonly' or 'readwrite'
-   * @param {function(IDBObjectStore): IDBRequest} operation
-   * @returns {Promise<*>}
-   */
   function _txn(storeName, mode, operation) {
     return new Promise((resolve, reject) => {
-      const db = _db;
-      if (!db) {
-        reject(new Error('Keyring not initialized. Call initKeyring() first.'));
-        return;
-      }
-
-      const txn = db.transaction(storeName, mode);
+      if (!_db) { reject(new Error('Keyring not initialized')); return; }
+      const txn = _db.transaction(storeName, mode);
       const store = txn.objectStore(storeName);
-      const request = operation(store);
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(new Error(`Keyring operation failed: ${request.error}`));
+      const req = operation(store);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(new Error(`Keyring op failed: ${req.error}`));
     });
   }
 
+  // ── Passphrase Key Derivation (PBKDF2) ────────────────────────────
+
   /**
-   * Save the user's identity keypair.
-   * Stores exported key strings so they survive IndexedDB serialization.
+   * Derive an AES-256-GCM wrapping key from a passphrase + salt.
+   * @param {string} passphrase — User's passphrase
+   * @param {Uint8Array} salt — 16-byte random salt
+   * @returns {Promise<CryptoKey>} — AES-256-GCM key
+   */
+  async function _deriveWrappingKey(passphrase, salt) {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(passphrase),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+
+    return crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: PBKDF2_ITERATIONS,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  /**
+   * Encrypt private key data with the wrapping key.
+   * @param {string} plaintext — Private key string to encrypt
+   * @param {CryptoKey} wrappingKey — AES-256-GCM key
+   * @returns {Promise<{ciphertext: ArrayBuffer, iv: Uint8Array}>}
+   */
+  async function _wrapPrivateKey(plaintext, wrappingKey) {
+    const encoder = new TextEncoder();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      wrappingKey,
+      encoder.encode(plaintext)
+    );
+    return { ciphertext, iv };
+  }
+
+  /**
+   * Decrypt private key data with the wrapping key.
+   * @param {ArrayBuffer} ciphertext — Encrypted private key
+   * @param {Uint8Array} iv — 12-byte IV
+   * @param {CryptoKey} wrappingKey — AES-256-GCM key
+   * @returns {Promise<string>} — Decrypted private key string
+   */
+  async function _unwrapPrivateKey(ciphertext, iv, wrappingKey) {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      wrappingKey,
+      ciphertext
+    );
+    return new TextDecoder().decode(decrypted);
+  }
+
+  // ── Keyring Lock/Unlock ───────────────────────────────────────────
+
+  /**
+   * Unlock the keyring with a passphrase.
+   * Derives the wrapping key and verifies it against stored identity.
+   * @param {string} passphrase
+   * @returns {Promise<boolean>} — true if unlock succeeded
+   */
+  async function unlock(passphrase) {
+    const identity = await _txn(STORE_IDENTITY, 'readonly', (s) => s.get('primary'));
+    if (!identity) {
+      throw new Error('No identity found. Generate keys first.');
+    }
+
+    const salt = new Uint8Array(identity.salt);
+    const wrappingKey = await _deriveWrappingKey(passphrase, salt);
+
+    try {
+      // Try to decrypt — if passphrase is wrong, AES-GCM will throw
+      const iv = new Uint8Array(identity.privateKeyIV);
+      const ct = new Uint8Array(identity.privateKeyCiphertext).buffer;
+      await _unwrapPrivateKey(ct, iv, wrappingKey);
+
+      // Success — store wrapping key in memory
+      _wrappingKey = wrappingKey;
+      return true;
+    } catch (e) {
+      _wrappingKey = null;
+      throw new Error('Wrong passphrase. Cannot unlock keyring.');
+    }
+  }
+
+  /**
+   * Lock the keyring — wipe the wrapping key from memory.
+   */
+  function lock() {
+    _wrappingKey = null;
+  }
+
+  /**
+   * Check if keyring is currently unlocked.
+   * @returns {boolean}
+   */
+  function isUnlocked() {
+    return _wrappingKey !== null;
+  }
+
+  // ── Identity (User's Keypair) ─────────────────────────────────────
+
+  /**
+   * Save the user's identity keypair, encrypted with a passphrase.
+   * Called once during key generation ("brew your keys").
    *
-   * @param {{encrypt: CryptoKeyPair, sign: CryptoKeyPair}} keypair — Raw CryptoKeyPair objects
-   * @param {string} email — User's email (optional label)
+   * @param {{encrypt: CryptoKeyPair, sign: CryptoKeyPair}} keypair
+   * @param {string} passphrase — User-chosen passphrase to protect keys
+   * @param {string} email — Optional label
    * @returns {Promise<void>}
    */
-  async function saveIdentity(keypair, email = '') {
+  async function saveIdentity(keypair, passphrase, email = '') {
+    // Export keys to strings
     const publicKeyStr = await NSSKeys.exportPublicKey(keypair);
     const privateKeyStr = await NSSKeys.exportPrivateKey(keypair);
     const publicKeys = {
@@ -101,150 +200,182 @@ const NSSKeyring = (() => {
     };
     const fingerprint = await NSSKeys.getFingerprint(publicKeys);
 
+    // Generate salt + derive wrapping key
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const wrappingKey = await _deriveWrappingKey(passphrase, salt);
+
+    // Wrap (encrypt) the private key
+    const { ciphertext, iv } = await _wrapPrivateKey(privateKeyStr, wrappingKey);
+
+    // Store: public key in plaintext, private key encrypted
     const record = {
       id: 'primary',
-      publicKey: publicKeyStr,
-      privateKey: privateKeyStr,
+      publicKey: publicKeyStr,                            // Plaintext (it's public)
+      privateKeyCiphertext: Array.from(new Uint8Array(ciphertext)),  // Encrypted
+      privateKeyIV: Array.from(iv),                       // IV for AES-GCM
+      salt: Array.from(salt),                             // Salt for PBKDF2
       fingerprint,
       email,
       createdAt: new Date().toISOString(),
+      pbkdf2Iterations: PBKDF2_ITERATIONS,
     };
 
-    return _txn(STORE_IDENTITY, 'readwrite', (store) => store.put(record));
+    await _txn(STORE_IDENTITY, 'readwrite', (store) => store.put(record));
+
+    // Keep wrapping key in memory (keyring is now unlocked)
+    _wrappingKey = wrappingKey;
   }
 
   /**
-   * Retrieve the user's identity.
-   * Returns exported strings and fingerprint. Caller must import keys as needed.
-   *
-   * @returns {Promise<{publicKey: string, privateKey: string, fingerprint: string, email: string, createdAt: string}|null>}
+   * Get the user's identity (public info — always available).
+   * @returns {Promise<{publicKey, fingerprint, email, createdAt}|null>}
    */
   async function getIdentity() {
-    const result = await _txn(STORE_IDENTITY, 'readonly', (store) => store.get('primary'));
-    return result || null;
+    const result = await _txn(STORE_IDENTITY, 'readonly', (s) => s.get('primary'));
+    if (!result) return null;
+    return {
+      publicKey: result.publicKey,
+      fingerprint: result.fingerprint,
+      email: result.email,
+      createdAt: result.createdAt,
+      locked: !isUnlocked(),
+    };
   }
 
   /**
-   * Add a trusted contact's public key.
-   *
-   * @param {string} name — Display name
-   * @param {string} email — Contact email
-   * @param {string} publicKeyStr — .nss format public key string
-   * @param {string} fingerprint — 8-char hex fingerprint
+   * Get the decrypted private key string. Requires unlocked keyring.
+   * @returns {Promise<string>} — Private key in .ss format
+   */
+  async function getPrivateKey() {
+    if (!_wrappingKey) {
+      throw new Error('Keyring is locked. Call unlock(passphrase) first.');
+    }
+
+    const identity = await _txn(STORE_IDENTITY, 'readonly', (s) => s.get('primary'));
+    if (!identity) throw new Error('No identity found.');
+
+    const iv = new Uint8Array(identity.privateKeyIV);
+    const ct = new Uint8Array(identity.privateKeyCiphertext).buffer;
+
+    return _unwrapPrivateKey(ct, iv, _wrappingKey);
+  }
+
+  /**
+   * Change the passphrase. Re-wraps the private key with new passphrase.
+   * Requires current keyring to be unlocked.
+   * @param {string} newPassphrase
    * @returns {Promise<void>}
    */
+  async function changePassphrase(newPassphrase) {
+    if (!_wrappingKey) {
+      throw new Error('Keyring must be unlocked to change passphrase.');
+    }
+
+    // Decrypt with old key
+    const privateKeyStr = await getPrivateKey();
+    const identity = await _txn(STORE_IDENTITY, 'readonly', (s) => s.get('primary'));
+
+    // Re-encrypt with new passphrase
+    const newSalt = crypto.getRandomValues(new Uint8Array(16));
+    const newWrappingKey = await _deriveWrappingKey(newPassphrase, newSalt);
+    const { ciphertext, iv } = await _wrapPrivateKey(privateKeyStr, newWrappingKey);
+
+    // Update record
+    identity.privateKeyCiphertext = Array.from(new Uint8Array(ciphertext));
+    identity.privateKeyIV = Array.from(iv);
+    identity.salt = Array.from(newSalt);
+
+    await _txn(STORE_IDENTITY, 'readwrite', (store) => store.put(identity));
+
+    _wrappingKey = newWrappingKey;
+  }
+
+  // ── Contacts (Public Keys Only) ───────────────────────────────────
+
   async function addContact(name, email, publicKeyStr, fingerprint) {
-    const record = {
-      fingerprint,
-      name,
-      email,
+    return _txn(STORE_CONTACTS, 'readwrite', (store) => store.put({
+      fingerprint, name, email,
       publicKey: publicKeyStr,
       addedAt: new Date().toISOString(),
       trusted: true,
-    };
-
-    return _txn(STORE_CONTACTS, 'readwrite', (store) => store.put(record));
+    }));
   }
 
-  /**
-   * Look up a contact by fingerprint.
-   * @param {string} fingerprint — 8-char hex fingerprint
-   * @returns {Promise<{fingerprint: string, name: string, email: string, publicKey: string, addedAt: string, trusted: boolean}|null>}
-   */
   async function getContact(fingerprint) {
-    const result = await _txn(STORE_CONTACTS, 'readonly', (store) => store.get(fingerprint));
-    return result || null;
+    const r = await _txn(STORE_CONTACTS, 'readonly', (s) => s.get(fingerprint));
+    return r || null;
   }
 
-  /**
-   * List all contacts.
-   * @returns {Promise<Array>}
-   */
   function getAllContacts() {
     return new Promise((resolve, reject) => {
-      if (!_db) {
-        reject(new Error('Keyring not initialized'));
-        return;
-      }
-
-      const txn = _db.transaction(STORE_CONTACTS, 'readonly');
-      const store = txn.objectStore(STORE_CONTACTS);
-      const request = store.getAll();
-
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => reject(new Error(`Failed to list contacts: ${request.error}`));
+      if (!_db) { reject(new Error('Keyring not initialized')); return; }
+      const req = _db.transaction(STORE_CONTACTS, 'readonly').objectStore(STORE_CONTACTS).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(new Error(`List contacts failed: ${req.error}`));
     });
   }
 
-  /**
-   * Remove a contact by fingerprint.
-   * @param {string} fingerprint
-   * @returns {Promise<void>}
-   */
   function removeContact(fingerprint) {
-    return _txn(STORE_CONTACTS, 'readwrite', (store) => store.delete(fingerprint));
+    return _txn(STORE_CONTACTS, 'readwrite', (s) => s.delete(fingerprint));
   }
 
-  /**
-   * Export all contacts as a JSON string for backup.
-   * @returns {Promise<string>}
-   */
   async function exportKeyring() {
     const contacts = await getAllContacts();
     const identity = await getIdentity();
-
     return JSON.stringify({
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
-      identity: identity
-        ? { fingerprint: identity.fingerprint, email: identity.email, publicKey: identity.publicKey }
-        : null,
-      contacts,
+      identity: identity ? { fingerprint: identity.fingerprint, email: identity.email, publicKey: identity.publicKey } : null,
+      contacts,  // Public keys only — private key NEVER exported here
     }, null, 2);
   }
 
-  /**
-   * Import contacts from a JSON string.
-   * Does NOT overwrite existing contacts — merges by fingerprint.
-   *
-   * @param {string} json — JSON string from exportKeyring()
-   * @returns {Promise<{imported: number, skipped: number}>}
-   */
   async function importKeyring(json) {
     const data = JSON.parse(json);
-
-    if (data.version !== 1) {
-      throw new Error(`Unsupported keyring export version: ${data.version}`);
+    let imported = 0, skipped = 0;
+    for (const c of (data.contacts || [])) {
+      if (await getContact(c.fingerprint)) { skipped++; }
+      else { await addContact(c.name, c.email, c.publicKey, c.fingerprint); imported++; }
     }
-
-    let imported = 0;
-    let skipped = 0;
-
-    for (const contact of (data.contacts || [])) {
-      const existing = await getContact(contact.fingerprint);
-      if (existing) {
-        skipped++;
-      } else {
-        await addContact(contact.name, contact.email, contact.publicKey, contact.fingerprint);
-        imported++;
-      }
-    }
-
     return { imported, skipped };
   }
 
-  // ── Public API ─────────────────────────────────────────────────────
+  // ── Auto-Lock Timer ───────────────────────────────────────────────
+
+  let _lockTimer = null;
+  const AUTO_LOCK_MS = 15 * 60 * 1000;  // 15 minutes
+
+  function _resetLockTimer() {
+    if (_lockTimer) clearTimeout(_lockTimer);
+    _lockTimer = setTimeout(() => {
+      lock();
+      console.log('[NSS] Keyring auto-locked after inactivity');
+    }, AUTO_LOCK_MS);
+  }
+
+  // ── Public API ────────────────────────────────────────────────────
 
   return {
     initKeyring,
+    // Lock / Unlock
+    unlock,
+    lock,
+    isUnlocked,
+    // Identity
     saveIdentity,
     getIdentity,
+    getPrivateKey,
+    changePassphrase,
+    // Contacts
     addContact,
     getContact,
     getAllContacts,
     removeContact,
+    // Import / Export
     exportKeyring,
     importKeyring,
+    // Auto-lock
+    _resetLockTimer,
   };
 })();
 
