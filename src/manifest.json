@@ -31,11 +31,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.facebook.com/*",
-        "*://*.twitter.com/*",
-        "*://*.x.com/*",
-        "*://*.youtube.com/*",
-        "*://*.reddit.com/*"
+        "<all_urls>"
       ],
       "js": [
         "content/detector.js",
@@ -56,6 +52,7 @@
   "web_accessible_resources": [
     "content/composer.js",
     "styles/nss-inline.css",
+    "styles/composer.css",
     "icons/nss-48-v2.png"
   ]
 }

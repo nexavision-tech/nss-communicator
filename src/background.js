@@ -340,6 +340,9 @@
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       if (tabs.length > 0) {
+        await browser.tabs.insertCSS(tabs[0].id, {
+          file: 'styles/composer.css',
+        });
         await browser.tabs.executeScript(tabs[0].id, {
           file: 'content/composer.js',
         });
