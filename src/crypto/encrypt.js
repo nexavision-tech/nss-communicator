@@ -126,6 +126,9 @@ const NSSEncrypt = (() => {
     if (cleanString.startsWith('>>--')) cleanString = cleanString.substring(4);
     if (cleanString.endsWith('-->')) cleanString = cleanString.substring(0, cleanString.length - 3);
 
+    // Remove zero-width spaces, newlines, and other whitespace social media might inject
+    cleanString = cleanString.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+
     const parts = cleanString.split(':');
 
     if (parts.length < 5 || parts[0] !== NSS_PREFIX) {

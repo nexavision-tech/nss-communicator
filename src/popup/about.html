@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>About NSS Communicator</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 40px;
+      min-height: 100vh;
+      background: #05080f;
+    }
+    .about-container {
+      width: 100%;
+      max-width: 600px;
+      padding: 30px;
+      background: #0a0e17;
+      border: 1px solid #1a2035;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 255, 136, 0.05);
+    }
+    .about-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #1a2035;
+      padding-bottom: 16px;
+    }
+    .about-header img {
+      width: 48px;
+      height: 48px;
+    }
+    .about-header h1 {
+      margin: 0;
+      color: #00ff88;
+      font-size: 24px;
+    }
+    .about-section {
+      margin-bottom: 24px;
+    }
+    .about-section h2 {
+      font-size: 16px;
+      color: #00ff88;
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+    .about-section p {
+      font-size: 14px;
+      color: #b0b0b0;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .about-section a {
+      color: #00ff88;
+      text-decoration: none;
+    }
+    .about-section a:hover {
+      text-decoration: underline;
+    }
+    .browser-badges {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .browser-badge {
+      background: #111827;
+      border: 1px solid #1a2035;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #e0e0e0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .disclaimer-box {
+      background: rgba(255, 68, 68, 0.1);
+      border: 1px solid rgba(255, 68, 68, 0.3);
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 24px;
+    }
+    .disclaimer-box p {
+      color: #ffaaaa;
+      margin: 0;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="about-container">
+    <div class="about-header">
+      <img src="../icons/nss-96-v2.png" alt="NSS Logo">
+      <div>
+        <h1>NSS Communicator</h1>
+        <div style="color: #666; font-size: 12px; margin-top: 4px;">v0.1.0 — by NexaVision Tech</div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>About the Project</h2>
+      <p>
+        NSS (NexaVision Secure Sockets) Communicator brings true end-to-end encryption to any social media platform.
+        Whether you are commenting on YouTube, posting on Reddit, or chatting on Discord, NSS ensures that only your intended recipient can read your message.
+      </p>
+      <p>
+        <strong>Contact us:</strong> <a href="mailto:info@nexavision.tech">info@nexavision.tech</a>
+      </p>
+    </div>
+
+    <div class="about-section">
+      <h2>Supported Browsers</h2>
+      <p>NSS Communicator is designed to work across the modern web ecosystem. Extensions will soon be available for:</p>
+      <div class="browser-badges">
+        <div class="browser-badge">🦊 Firefox</div>
+        <div class="browser-badge">🌐 Google Chrome</div>
+        <div class="browser-badge">🧭 Apple Safari</div>
+        <div class="browser-badge">🌊 Microsoft Edge</div>
+        <div class="browser-badge">⭕ Opera</div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>Open Source & Trust</h2>
+      <p>
+        Security software should never be a black box. NSS Communicator is 100% open-source software, licensed under the <strong>GNU General Public License v3.0</strong>.
+      </p>
+      <p>
+        If you are highly paranoid (and you should be!), or if you don't trust the pre-built web store versions, we encourage you to inspect the source code and build the extension yourself directly from our GitHub repository.
+      </p>
+      <p>
+        <a href="https://github.com/nexavision-tech/nss-communicator" target="_blank" rel="noopener">
+          &rarr; View Source on GitHub
+        </a>
+      </p>
+    </div>
+
+    <div class="disclaimer-box">
+      <strong>⚠️ Disclaimer: Use at your own risk</strong>
+      <p style="margin-top: 8px;">
+        This software is provided "as is", without warranty of any kind, express or implied. In no event shall the authors or copyright holders be liable for any claim, damages or other liability. Always verify the public keys of your contacts through a secondary secure channel.
+      </p>
+    </div>
+
+  </div>
+
+</body>
+</html>
