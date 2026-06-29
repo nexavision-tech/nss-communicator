@@ -34,6 +34,16 @@
   const importKeyringBtn = document.getElementById('import-keyring-btn');
   const importKeyringFile = document.getElementById('import-keyring-file');
   const changePassphraseBtn = document.getElementById('change-passphrase-btn');
+  const mainView = document.getElementById('main-view');
+  const composerView = document.getElementById('composer-view');
+  const backToMainBtn = document.getElementById('back-to-main-btn');
+  const recipientSelect = document.getElementById('nss-recipient-select');
+  const messageInput = document.getElementById('nss-message-input');
+  const encryptBtn = document.getElementById('nss-encrypt-btn');
+  const outputStatusContainer = document.getElementById('nss-composer-status-container');
+  const outputTextarea = document.getElementById('nss-output');
+  
+  const FOOTER_TEXT = '\n\n🏹 To read this secure message, install NSS Communicator:\nhttps://github.com/nexavision-tech/nss-communicator';
 
   // ── Initialize ─────────────────────────────────────────────────────
 
@@ -243,13 +253,84 @@
       return;
     }
 
-    const response = await browser.runtime.sendMessage({ type: 'nss-open-composer' });
-
-    if (response.success) {
-      window.close(); // Close popup after injecting composer
-    } else {
-      showToast('✗ ' + response.error, 'error');
+    // Populate contacts
+    const response = await browser.runtime.sendMessage({ type: 'nss-get-contacts' });
+    recipientSelect.innerHTML = `
+      <option value="PUBLIC" selected>🌎 Public (Anyone can read)</option>
+      <option disabled>──────────</option>
+    `;
+    if (response.success && response.contacts) {
+      for (const contact of response.contacts) {
+        const opt = document.createElement('option');
+        opt.value = contact.fingerprint;
+        opt.textContent = `👤 ${contact.name} (${contact.fingerprint})`;
+        recipientSelect.appendChild(opt);
+      }
     }
+
+    // Reset fields
+    messageInput.value = '';
+    outputStatusContainer.style.display = 'none';
+    outputTextarea.value = '';
+    encryptBtn.textContent = '📡 Sign & Copy';
+    
+    // Switch views
+    mainView.style.display = 'none';
+    composerView.style.display = 'block';
+    messageInput.focus();
+  });
+
+  backToMainBtn.addEventListener('click', () => {
+    composerView.style.display = 'none';
+    mainView.style.display = 'block';
+  });
+
+  recipientSelect.addEventListener('change', () => {
+    if (recipientSelect.value === 'PUBLIC') {
+      encryptBtn.textContent = '📡 Sign & Copy';
+    } else {
+      encryptBtn.textContent = '🔐 Encrypt & Copy';
+    }
+  });
+
+  encryptBtn.addEventListener('click', async () => {
+    const isPublic = recipientSelect.value === 'PUBLIC';
+    const channel = isPublic ? 0 : 1;
+    const recipientFp = isPublic ? null : recipientSelect.value;
+    const message = messageInput.value.trim();
+
+    if (!message) {
+      showToast('✗ Type a message first', 'error');
+      return;
+    }
+
+    encryptBtn.disabled = true;
+    encryptBtn.textContent = '⏳ Encrypting…';
+
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: 'nss-encrypt',
+        message,
+        recipientFingerprint: recipientFp,
+        channel,
+      });
+
+      if (response && response.success) {
+        const fullText = response.nssString + FOOTER_TEXT;
+        await navigator.clipboard.writeText(fullText);
+        
+        outputStatusContainer.style.display = 'block';
+        outputTextarea.value = response.nssString;
+        showToast('✓ Copied to clipboard!', 'success');
+      } else {
+        showToast('✗ ' + (response ? response.error : 'Encryption failed'), 'error');
+      }
+    } catch (err) {
+      showToast('✗ ' + err.message, 'error');
+    }
+
+    encryptBtn.disabled = false;
+    encryptBtn.textContent = isPublic ? '📡 Sign & Copy' : '🔐 Encrypt & Copy';
   });
 
   // ── Contacts ───────────────────────────────────────────────────────
@@ -303,8 +384,31 @@
 
   // ── Import .nss Key ────────────────────────────────────────────────
 
-  importKeyBtn.addEventListener('click', () => {
-    browser.tabs.create({ url: browser.runtime.getURL('popup/import.html') });
+  importKeyBtn.addEventListener('click', async () => {
+    const result = await nssPrompt('Import Contact Key', [
+      { id: 'import-name', label: 'Contact Name (e.g. Alice)', placeholder: 'Alice' },
+      { id: 'import-key', label: 'Paste .nss Public Key', type: 'textarea', placeholder: '-----BEGIN PUBLIC KEY-----\n...' }
+    ]);
+    
+    if (!result || !result['import-name'] || !result['import-key']) return;
+
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: 'nss-import-key',
+        name: result['import-name'].trim(),
+        email: '',
+        keyData: result['import-key'].trim()
+      });
+
+      if (response.success) {
+        showToast('✓ Contact imported successfully', 'success');
+        await loadContacts();
+      } else {
+        showToast('✗ ' + response.error, 'error');
+      }
+    } catch (err) {
+      showToast('✗ ' + err.message, 'error');
+    }
   });
 
   // ── Keyring Import/Export ──────────────────────────────────────────
@@ -320,8 +424,29 @@
     }
   });
 
-  importKeyringBtn.addEventListener('click', () => {
-    browser.tabs.create({ url: browser.runtime.getURL('popup/import.html#keyring') });
+  importKeyringBtn.addEventListener('click', async () => {
+    const result = await nssPrompt('Import Keyring', [
+      { id: 'import-keyring', label: 'Paste nss-keyring.json contents', type: 'textarea' }
+    ]);
+    
+    if (!result || !result['import-keyring']) return;
+
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: 'nss-import-keyring',
+        data: result['import-keyring'].trim()
+      });
+
+      if (response.success) {
+        showToast(`✓ Imported: ${response.imported} keys (Skipped: ${response.skipped})`, 'success');
+        await loadIdentity();
+        await loadContacts();
+      } else {
+        showToast('✗ ' + response.error, 'error');
+      }
+    } catch (err) {
+      showToast('✗ ' + err.message, 'error');
+    }
   });
 
   // ── Utilities ──────────────────────────────────────────────────────
@@ -394,7 +519,10 @@
       html += `
         <div class="nss-field">
           <label for="${f.id}">${escapeHtml(f.label)}</label>
-          <input type="${f.type || 'text'}" id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}">
+          ${f.type === 'textarea'
+            ? `<textarea id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" rows="4" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; resize: vertical; font-family: monospace; font-size: 11px; margin-top: 4px;"></textarea>`
+            : `<input type="${f.type || 'text'}" id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}" style="margin-top: 4px;">`
+          }
         </div>
       `;
     });

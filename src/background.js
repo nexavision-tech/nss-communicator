@@ -63,9 +63,6 @@
       case 'nss-import-keyring':
         return handleImportKeyring(message);
 
-      case 'nss-open-composer':
-        return handleOpenComposer(sender);
-
       default:
         return { success: false, error: `Unknown message type: ${message.type}` };
     }
@@ -334,23 +331,4 @@
     }
   }
 
-  // ── Composer ───────────────────────────────────────────────────────
-
-  async function handleOpenComposer(sender) {
-    try {
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-      if (tabs.length > 0) {
-        await browser.tabs.insertCSS(tabs[0].id, {
-          file: 'styles/composer.css',
-        });
-        await browser.tabs.executeScript(tabs[0].id, {
-          file: 'content/composer.js',
-        });
-        return { success: true };
-      }
-      return { success: false, error: 'No active tab' };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  }
 })();

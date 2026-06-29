@@ -50,9 +50,7 @@
     }
   },
   "web_accessible_resources": [
-    "content/composer.js",
     "styles/nss-inline.css",
-    "styles/composer.css",
     "icons/nss-48-v2.png"
   ]
 }

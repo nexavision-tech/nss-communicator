@@ -8,7 +8,9 @@
 </head>
 <body>
   <div class="nss-popup">
-    <!-- Header -->
+    <!-- Main View -->
+    <div id="main-view">
+      <!-- Header -->
     <header class="nss-header">
       <div class="nss-logo">
         <span class="nss-logo-icon">🔒</span>
@@ -137,6 +139,41 @@
         </div>
       </div>
     </footer>
+    </div> <!-- End Main View -->
+
+    <!-- Composer View -->
+    <div id="composer-view" style="display: none; padding-bottom: 20px;">
+      <section class="nss-section">
+        <div class="nss-section-header">
+          <h2 class="nss-section-title">✍️ Compose Message</h2>
+          <button id="back-to-main-btn" class="nss-btn nss-btn-ghost nss-btn-small">Back</button>
+        </div>
+        
+        <div class="nss-field">
+          <label for="nss-recipient-select">Recipient</label>
+          <select id="nss-recipient-select" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; margin-bottom: 12px;">
+            <option value="PUBLIC" selected>🌎 Public (Anyone can read)</option>
+            <option disabled>──────────</option>
+          </select>
+        </div>
+        
+        <div class="nss-field">
+          <label for="nss-message-input">Message</label>
+          <textarea id="nss-message-input" rows="5" placeholder="Type your message…" style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #e0e0e0; resize: vertical; min-height: 80px; font-family: inherit; margin-bottom: 16px;"></textarea>
+        </div>
+        
+        <button id="nss-encrypt-btn" class="nss-btn nss-btn-primary nss-btn-full">
+          📡 Sign & Copy
+        </button>
+        
+        <div id="nss-composer-status-container" style="display:none; margin-top:16px;">
+          <div class="nss-field">
+            <label style="color: #00ff88;">Encrypted Output (Copied!)</label>
+            <textarea id="nss-output" rows="3" readonly style="width: 100%; padding: 8px; border-radius: 6px; background: #111827; border: 1px solid #1a2035; color: #00ff88; resize: vertical; font-family: monospace; font-size: 11px; word-break: break-all; margin-bottom: 0;"></textarea>
+          </div>
+        </div>
+      </section>
+    </div> <!-- End Composer View -->
   </div>
 
   <!-- Custom Modal -->
